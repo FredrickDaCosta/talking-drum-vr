@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isLive = Boolean(process.env.LIVE_URL);
+const defaultPreviewUrl = 'https://localhost:4173/talking-drum-vr/';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -10,7 +11,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: process.env.LIVE_URL ?? 'http://localhost:4173/talking-drum-vr/',
+    baseURL: process.env.LIVE_URL ?? defaultPreviewUrl,
+    ignoreHTTPSErrors: !isLive,
     trace: 'off',
     video: 'off',
     screenshot: 'off',
@@ -21,7 +23,12 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl'],
+          args: [
+            '--use-gl=angle',
+            '--use-angle=swiftshader',
+            '--enable-webgl',
+            '--ignore-certificate-errors',
+          ],
         },
       },
     },
@@ -30,7 +37,8 @@ export default defineConfig({
     ? undefined
     : {
         command: 'npm run preview -- --host 0.0.0.0 --port 4173',
-        url: 'http://localhost:4173/talking-drum-vr/',
+        url: defaultPreviewUrl,
+        ignoreHTTPSErrors: true,
         reuseExistingServer: !process.env.CI,
         timeout: 60_000,
       },

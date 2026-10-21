@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const targetUrl = process.env.LIVE_URL ?? 'http://localhost:4173/talking-drum-vr/';
+const targetUrl = process.env.LIVE_URL ?? 'https://localhost:4173/talking-drum-vr/';
 
 test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
   test('loads cleanly with zero console errors, zero 404/failed requests, and renders Enter VR control', async ({
