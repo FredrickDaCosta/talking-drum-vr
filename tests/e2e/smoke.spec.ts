@@ -1,9 +1,11 @@
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 const rawBasePath = process.env.BASE_PATH ?? '/';
 const normalizedBasePath = rawBasePath.startsWith('/') ? rawBasePath : `/${rawBasePath}`;
 const defaultPreviewUrl = `https://localhost:4173${normalizedBasePath.endsWith('/') ? normalizedBasePath : `${normalizedBasePath}/`}`;
 const targetUrl = process.env.LIVE_URL ?? defaultPreviewUrl;
+const iwerBundlePath = path.resolve(process.cwd(), 'node_modules/iwer/build/iwer.min.js');
 
 const EXPECTED_VR_UNAVAILABLE_MESSAGE =
   "VR isn't available in this browser. Open this page in Meta Quest Browser, or on a desktop use the Immersive Web Emulator extension.";
@@ -179,6 +181,166 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
     expect(
       thirdPartyRequests,
       `Disallowed third-party requests: ${thirdPartyRequests.join(', ')}`,
+    ).toEqual([]);
+    expect(badStatusResponses, `HTTP >= 400 responses: ${badStatusResponses.join(', ')}`).toEqual(
+      [],
+    );
+    expect(failedRequests, `Failed network requests: ${failedRequests.join(', ')}`).toEqual([]);
+    expect(consoleErrors, `Console/page errors: ${consoleErrors.join(' | ')}`).toEqual([]);
+  });
+
+  test('starts immersive-vr session with injected IWER in hand mode with zero third-party requests and zero console errors', async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    const badStatusResponses: string[] = [];
+    const trackedRequests: import('@playwright/test').Request[] = [];
+
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+    page.on('pageerror', (err) => {
+      consoleErrors.push(err.message);
+    });
+    page.on('request', (request) => {
+      trackedRequests.push(request);
+    });
+    page.on('requestfailed', (request) => {
+      const failure = request.failure()?.errorText ?? 'unknown';
+      failedRequests.push(`${request.method()} ${request.url()} (${failure})`);
+    });
+    page.on('response', (response) => {
+      if (response.status() >= 400) {
+        badStatusResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    await page.addInitScript({ path: iwerBundlePath });
+    await page.addInitScript(() => {
+      const iwerGlobal = (
+        window as unknown as {
+          IWER?: {
+            XRDevice: new (config: unknown) => {
+              installRuntime: (opts?: { forceInstall?: boolean }) => void;
+              primaryInputMode: 'controller' | 'hand';
+            };
+            metaQuest3: unknown;
+          };
+        }
+      ).IWER;
+      if (!iwerGlobal) {
+        throw new Error('IWER bundle did not attach window.IWER');
+      }
+      const xrDevice = new iwerGlobal.XRDevice(iwerGlobal.metaQuest3);
+      xrDevice.installRuntime({ forceInstall: true });
+      xrDevice.primaryInputMode = 'hand';
+      (window as unknown as Record<string, unknown>).__xrDevice = xrDevice;
+    });
+
+    const response = await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    expect(response?.status()).toBeLessThan(400);
+
+    const enterVrButton = page.getByTestId('enter-vr-button');
+    await expect(enterVrButton).toHaveText('Enter VR');
+    await enterVrButton.click();
+
+    await expect(enterVrButton).toHaveText('Exit VR');
+    await page.waitForTimeout(1000);
+
+    const allRequestUrls = trackedRequests
+      .map((req) => req.url())
+      .filter((u) => !u.startsWith('data:') && !u.startsWith('blob:'));
+    expect(
+      allRequestUrls.some((u) => u.endsWith('/xr-profiles/generic-hand/left.glb')),
+      'Expected local generic-hand/left.glb to be requested',
+    ).toBe(true);
+    expect(
+      allRequestUrls.some((u) => u.endsWith('/xr-profiles/generic-hand/right.glb')),
+      'Expected local generic-hand/right.glb to be requested',
+    ).toBe(true);
+
+    const thirdPartyRequests = collectThirdPartyRequests(trackedRequests, response, page.url());
+
+    expect(
+      thirdPartyRequests,
+      `Disallowed third-party requests during XR hand session: ${thirdPartyRequests.join(', ')}`,
+    ).toEqual([]);
+    expect(badStatusResponses, `HTTP >= 400 responses: ${badStatusResponses.join(', ')}`).toEqual(
+      [],
+    );
+    expect(failedRequests, `Failed network requests: ${failedRequests.join(', ')}`).toEqual([]);
+    expect(consoleErrors, `Console/page errors: ${consoleErrors.join(' | ')}`).toEqual([]);
+  });
+
+  test('starts immersive-vr session with injected IWER in controller mode with zero third-party requests and zero console errors', async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    const badStatusResponses: string[] = [];
+    const trackedRequests: import('@playwright/test').Request[] = [];
+
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+    page.on('pageerror', (err) => {
+      consoleErrors.push(err.message);
+    });
+    page.on('request', (request) => {
+      trackedRequests.push(request);
+    });
+    page.on('requestfailed', (request) => {
+      const failure = request.failure()?.errorText ?? 'unknown';
+      failedRequests.push(`${request.method()} ${request.url()} (${failure})`);
+    });
+    page.on('response', (response) => {
+      if (response.status() >= 400) {
+        badStatusResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    await page.addInitScript({ path: iwerBundlePath });
+    await page.addInitScript(() => {
+      const iwerGlobal = (
+        window as unknown as {
+          IWER?: {
+            XRDevice: new (config: unknown) => {
+              installRuntime: (opts?: { forceInstall?: boolean }) => void;
+              primaryInputMode: 'controller' | 'hand';
+            };
+            metaQuest3: unknown;
+          };
+        }
+      ).IWER;
+      if (!iwerGlobal) {
+        throw new Error('IWER bundle did not attach window.IWER');
+      }
+      const xrDevice = new iwerGlobal.XRDevice(iwerGlobal.metaQuest3);
+      xrDevice.installRuntime({ forceInstall: true });
+      xrDevice.primaryInputMode = 'controller';
+      (window as unknown as Record<string, unknown>).__xrDevice = xrDevice;
+    });
+
+    const response = await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    expect(response?.status()).toBeLessThan(400);
+
+    const enterVrButton = page.getByTestId('enter-vr-button');
+    await expect(enterVrButton).toHaveText('Enter VR');
+    await enterVrButton.click();
+
+    await expect(enterVrButton).toHaveText('Exit VR');
+    await page.waitForTimeout(1000);
+
+    const thirdPartyRequests = collectThirdPartyRequests(trackedRequests, response, page.url());
+
+    expect(
+      thirdPartyRequests,
+      `Disallowed third-party requests during XR controller session: ${thirdPartyRequests.join(', ')}`,
     ).toEqual([]);
     expect(badStatusResponses, `HTTP >= 400 responses: ${badStatusResponses.join(', ')}`).toEqual(
       [],

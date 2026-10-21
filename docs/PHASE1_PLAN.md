@@ -27,11 +27,13 @@ flowchart LR
 
 ### 2.1 Task 0 Spike (First Task of M1): Verify Zero Third-Party Mesh Fetches in XR
 
-- **Why This Runs First:** `@iwsdk/xr-input` includes `XRHandVisualAdapter` and `XRControllerVisualAdapter`, which may attempt to load hand or controller glTF profiles from an external CDN when an `XRInputSource` connects during an active XR session.
-- **Spike Procedure:**
-  1. Add `iwer` as an explicit `devDependency` in `package.json` and run an automated Playwright test that starts an emulated `immersive-vr` session with virtual hands connected while recording all network requests.
-  2. Confirm whether any request leaves the application's origin.
-  3. **If any third-party fetch occurs:** Override the hand/controller visual loader (or bundle the minimal asset locally under `public/`) **before starting any other M1 task**, so the XR-session Playwright e2e test enforces **zero third-party requests** both outside and inside an active WebXR session.
+- **Why This Runs First:** `@iwsdk/xr-input` includes `XRHandVisualAdapter` and `XRControllerVisualAdapter`, which attempt to load hand or controller glTF profiles from `https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/...` when an `XRInputSource` connects during an active XR session.
+- **Spike Findings & Approved Resolution (M1a):**
+  1. **Vendored Hand Meshes (`@webxr-input-profiles/assets@1.0.20`):** Vendor `left.glb` (`94,572 B`), `right.glb` (`94,004 B`), and `LICENSE` (`1,094 B`, MIT) under `public/xr-profiles/generic-hand/` and `public/xr-profiles/LICENSE`.
+  2. **Supported `@iwsdk/xr-input` 1.0.1 Hook (`updateVisualImplementation` + `VisualConstructor.assetPath`):** Subclass `AnimatedHand` for left and right hands with `static assetPath = "${baseUrl}xr-profiles/generic-hand/${handedness}.glb"` and register them via `world.input.xr.visualAdapters.hand[handedness].updateVisualImplementation(...)` (`src/platform/xr-profiles.ts`).
+  3. **Controller Visual Fetch Disabled (`connectVisual` no-op):** Set `connectVisual` to a no-op on `world.input.xr.visualAdapters.controller.left` and `world.input.xr.visualAdapters.controller.right` so controller `.glb` meshes are never fetched over the network.
+  4. **M1b Follow-Up (Controller-Only Guidance):** In M1b, display a friendly in-app message when only controllers are active in an XR session: _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_
+  5. **Permanent E2E Regression Tests:** `tests/e2e/smoke.spec.ts` runs injected-IWER XR session tests in both **hand mode** and **controller mode**, asserting zero third-party requests and zero console errors in both modes.
 
 ### 2.2 `HandTracker` Adapter (`src/input/hand-tracker.ts`) & Dual-Path `OneEuroFilter3D` (`src/input/one-euro-filter.ts`)
 
@@ -122,6 +124,12 @@ flowchart LR
   - To fix the M0 lower-edge cropping and welcome-panel crowding:
     1. Tilt the drum `30°` toward the player (`drumTiltDeg: 30`) and adjust the flat desktop camera `lookAt` / `position` in `iwsdk.config.json` and `public/scenes/main.iwsdk.scene.json` (`camera.position: [0, 1.6, 0.45]`, `camera.lookAt: [0, 1.22, -0.50]`).
     2. Raise `welcome-panel` in `public/scenes/main.iwsdk.scene.json` (`y: 1.68, z: -1.42`) so it sits cleanly above the top of the drum.
+  - **Mandatory M1b Conditions for Vertical Drum + `30°` Tilt (Amendment 1):**
+    - **(a) Scene-JSON Rotation Field Verification:** Confirm the exact scene-JSON field for rotation (`rotationDeg` is assumed) against the IWSDK scene schema or `npm run content:validate` validator output before relying on it in `public/scenes/main.iwsdk.scene.json`.
+    - **(b) Single Source of Truth for Drum Geometry:** Share the drum half-length (`lengthMeters / 2 = 0.19 m`) and head radius (`headRadiusMeters = 0.11 m`) from a single source of truth between `src/scene-assets/talking-drum.scene-asset.ts` and `src/app/config.ts`, enforced by a unit test that fails if they diverge.
+    - **(c) Dual Head-Normal Verification:** Add both a pure-maths unit test using `drumTiltDeg` (`[0, cos(30°), sin(30°)]`) AND a Playwright e2e check inspecting the runtime drum object's world quaternion in the emulator.
+    - **(d) Tilted Head-Centre Reach Calculation ($\le 0.61\text{ m}$):** With drum centre at $(0, 1.25, -0.50)$ and local top head at $(0, +0.19, 0)$ tilted $+30^\circ$ around $+X$, the top drumhead centre is at $(0, 1.25 + 0.19\cos 30^\circ, -0.50 + 0.19\sin 30^\circ) = (0, 1.4145\text{ m}, -0.4050\text{ m})$, which is **`0.4050 m` horizontally ahead** and **`0.4452 m` (`~0.45 m`) 3D Euclidean distance** from the default eye position $(0, 1.60, 0)$ — well within the `0.61 m` (`2 ft`) reach limit. Compute and report these exact values in M1b.
+  - **M1b Controller-Only Notice:** When an XR session has active controllers and no tracked hands, display a friendly notice instructing the player to put the controllers down and enable hand tracking.
   - **On-Device Reach & Eye-Level Note:** Both seated eye-level calibration and comfortable right-hand strike reach at `0.50 m` must be verified on a physical Meta Quest headset.
 - **Startup Loading Banner (`index.html` + `src/index.ts`):**
   - Inline HTML/CSS `#app-loading-banner` (`role="status"`, `aria-live="polite"`) visible immediately at first paint (`"Loading Talking Drum VR..."`).
