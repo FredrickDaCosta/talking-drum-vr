@@ -1,8 +1,9 @@
-import { createSystem, UIKitMLAsset, Vector3, VisibilityState } from '@iwsdk/core';
+import { createSystem, type UIKit, UIKitMLAsset, Vector3, VisibilityState } from '@iwsdk/core';
 import { APP_CONFIG } from './app/config.js';
 import { getAppFlags } from './app/flags.js';
 import { TalkingDrum } from './app/talking-drum-component.js';
 import { DebugHud } from './debug/debug-hud.js';
+import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
 
 export class PanelSystem extends createSystem({
@@ -27,11 +28,42 @@ export class PanelSystem extends createSystem({
     }
 
     const domEnterBtn = document.getElementById('enter-vr-button') as HTMLButtonElement | null;
+    const domStatusEl = document.getElementById('vr-status-message') as HTMLDivElement | null;
+    const panel = this.world.getSceneObject<UIKitMLAsset>('welcome-panel');
+    const xrButton = panel?.getElementById('xr-button');
+    const exitButton = panel?.getElementById('exit-button');
+    const panelStatusEl = panel?.getElementById<UIKit.Text>('vr-status');
+
+    const updateStatusMessage = (message: string | null): void => {
+      const hasMessage = message != null && message.length > 0;
+      if (domStatusEl !== null) {
+        domStatusEl.textContent = hasMessage ? message : '';
+        domStatusEl.hidden = !hasMessage;
+      }
+      if (panelStatusEl != null) {
+        panelStatusEl.setProperties({
+          text: hasMessage ? message : '',
+          display: hasMessage ? 'flex' : 'none',
+        });
+      }
+    };
+
+    const launchXR = (): void => {
+      void requestImmersiveVrSession({
+        world: this.world,
+        onStatusMessage: updateStatusMessage,
+      });
+    };
+
+    const exitXR = (): void => {
+      this.world.exitXR();
+    };
+
     const launchOrExitDomXR = (): void => {
       if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) {
-        this.world.launchXR();
+        launchXR();
       } else {
-        this.world.exitXR();
+        exitXR();
       }
     };
 
@@ -39,17 +71,6 @@ export class PanelSystem extends createSystem({
       domEnterBtn.addEventListener('click', launchOrExitDomXR);
       this.cleanupFuncs.push(() => domEnterBtn.removeEventListener('click', launchOrExitDomXR));
     }
-
-    const panel = this.world.getSceneObject<UIKitMLAsset>('welcome-panel');
-    const xrButton = panel?.getElementById('xr-button');
-    const exitButton = panel?.getElementById('exit-button');
-
-    const launchXR = (): void => {
-      this.world.launchXR();
-    };
-    const exitXR = (): void => {
-      this.world.exitXR();
-    };
 
     if (xrButton != null && exitButton != null) {
       if (!this.world.xrEnabled) {
@@ -70,6 +91,8 @@ export class PanelSystem extends createSystem({
         const is2D = visibilityState === VisibilityState.NonImmersive;
         if (is2D) {
           this.calibratedInSession = false;
+        } else {
+          updateStatusMessage(null);
         }
         if (xrButton != null && exitButton != null && this.world.xrEnabled) {
           xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
