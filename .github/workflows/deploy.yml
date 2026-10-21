@@ -76,7 +76,7 @@ jobs:
     permissions:
       contents: read
     env:
-      LIVE_URL: ${{ vars.LIVE_URL || needs.deploy.outputs.page_url || 'https://da-costa.online/talking-drum-vr/' }}
+      LIVE_URL: ${{ vars.LIVE_URL || needs.deploy.outputs.page_url || 'https://fredrickdacosta.github.io/talking-drum-vr/' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
