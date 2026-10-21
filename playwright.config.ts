@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isLive = Boolean(process.env.LIVE_URL);
-const defaultPreviewUrl = 'https://localhost:4173/talking-drum-vr/';
+const rawBasePath = process.env.BASE_PATH ?? '/';
+const normalizedBasePath = rawBasePath.startsWith('/') ? rawBasePath : `/${rawBasePath}`;
+const defaultPreviewUrl = `https://localhost:4173${normalizedBasePath.endsWith('/') ? normalizedBasePath : `${normalizedBasePath}/`}`;
 
 export default defineConfig({
   testDir: './tests/e2e',

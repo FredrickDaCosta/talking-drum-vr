@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Custom Domain & Root Base Path (`drum.da-costa.online`):** Switched default `BASE_PATH` from `/talking-drum-vr/` to `/` and default `LIVE_URL` to `https://drum.da-costa.online/` across Vite, Playwright, GitHub Actions CI/Deploy workflows, and documentation following GitHub Pages custom domain verification and HTTPS enforcement (`301` redirect from `https://fredrickdacosta.github.io/talking-drum-vr/` to `https://drum.da-costa.online/`).
+
 ## [m0] - 2026-10-21 ("Hello XR" Baseline)
 
 ### Release Metadata

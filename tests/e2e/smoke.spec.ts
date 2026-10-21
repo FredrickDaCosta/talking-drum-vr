@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-const targetUrl = process.env.LIVE_URL ?? 'https://localhost:4173/talking-drum-vr/';
+const rawBasePath = process.env.BASE_PATH ?? '/';
+const normalizedBasePath = rawBasePath.startsWith('/') ? rawBasePath : `/${rawBasePath}`;
+const defaultPreviewUrl = `https://localhost:4173${normalizedBasePath.endsWith('/') ? normalizedBasePath : `${normalizedBasePath}/`}`;
+const targetUrl = process.env.LIVE_URL ?? defaultPreviewUrl;
 
 const EXPECTED_VR_UNAVAILABLE_MESSAGE =
   "VR isn't available in this browser. Open this page in Meta Quest Browser, or on a desktop use the Immersive Web Emulator extension.";

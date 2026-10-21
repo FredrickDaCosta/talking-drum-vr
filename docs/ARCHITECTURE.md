@@ -3,7 +3,7 @@
 ## Stack
 
 - **Runtime & ECS:** Immersive Web SDK (`@iwsdk/core` 1.0.1) + Three.js (`super-three` 0.181.0)
-- **Language & Build:** TypeScript (strict) + Vite (`BASE_PATH` configurable, default `/talking-drum-vr/`)
+- **Language & Build:** TypeScript (strict) + Vite (`BASE_PATH` configurable, default `/`)
 - **Node Runtime:** Node 24 (`>=20.19` supported; see [ADR-007](adr/ADR-007.md))
 
 ## Directory Layout

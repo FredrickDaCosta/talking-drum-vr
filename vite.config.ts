@@ -7,7 +7,7 @@ import { defineConfig } from 'vite';
 process.env.IWSDK_DEV_OPEN ??= 'false';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const basePath = process.env.BASE_PATH ?? '/talking-drum-vr/';
+const basePath = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
   plugins: [iwsdkDev()],

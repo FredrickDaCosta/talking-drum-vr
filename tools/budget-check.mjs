@@ -37,7 +37,7 @@ function walkFiles(dir) {
 }
 
 function stripBasePath(urlPath) {
-  // Resolve an asset URL from index.html (e.g. "/talking-drum-vr/assets/foo.js" or "./assets/foo.js")
+  // Resolve an asset URL from index.html (e.g. "/assets/foo.js" or "./assets/foo.js")
   // into a path relative to dist/
   const idx = urlPath.indexOf('assets/');
   if (idx !== -1) {
