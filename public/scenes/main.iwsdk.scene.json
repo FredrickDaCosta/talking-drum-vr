@@ -1,0 +1,87 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": {
+      "sky": [0.16, 0.22, 0.34, 1],
+      "equator": [0.42, 0.34, 0.28, 1],
+      "ground": [0.22, 0.16, 0.12, 1],
+      "intensity": 1
+    },
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [0.75, 0.78, 0.85, 1],
+      "equator": [0.68, 0.62, 0.54, 1],
+      "ground": [0.38, 0.3, 0.22, 1],
+      "intensity": 1.1
+    }
+  },
+  "resources": {},
+  "nodes": [
+    {
+      "id": "key-light",
+      "name": "Key Light",
+      "transform": {
+        "position": [1.2, 2.6, 1.0],
+        "rotationDeg": [45, -35, 0]
+      },
+      "components": {
+        "com.iwsdk.components.DirectionalLight": {
+          "color": [1, 0.94, 0.84, 1],
+          "intensity": 2.0
+        }
+      }
+    },
+    {
+      "id": "fill-light",
+      "name": "Fill Light",
+      "transform": {
+        "position": [0, 2.0, 0]
+      },
+      "components": {
+        "com.iwsdk.components.HemisphereLight": {
+          "skyColor": [0.85, 0.9, 1, 1],
+          "groundColor": [0.45, 0.32, 0.2, 1],
+          "intensity": 0.8
+        }
+      }
+    },
+    {
+      "id": "talking-drum",
+      "name": "Placeholder Talking Drum",
+      "content": {
+        "type": "asset",
+        "asset": "talking-drum"
+      },
+      "transform": {
+        "position": [0, 1.25, -0.5]
+      },
+      "components": {
+        "TalkingDrum": {
+          "distanceAheadMeters": 0.5,
+          "belowEyeLevelMeters": 0.35
+        }
+      }
+    },
+    {
+      "id": "welcome-panel",
+      "name": "Welcome Panel",
+      "content": {
+        "type": "asset",
+        "asset": "welcome-panel"
+      },
+      "transform": {
+        "position": [0, 1.58, -1.25],
+        "scale": 0.35
+      },
+      "components": {
+        "RayInteractable": {},
+        "ScreenSpace": {
+          "top": "20px",
+          "left": "20px",
+          "width": "320px",
+          "height": "220px"
+        }
+      }
+    }
+  ]
+}

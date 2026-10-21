@@ -1,12 +1,13 @@
 {
   "name": "talking-drum-vr",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-  "forwardPorts": [5173, 4173],
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
+  "forwardPorts": [8081, 5173, 4173],
   "portsAttributes": {
+    "8081": { "label": "Vite HTTPS dev (IWSDK)", "onAutoForward": "notify" },
     "5173": { "label": "Vite dev", "onAutoForward": "notify" },
     "4173": { "label": "Vite preview", "onAutoForward": "silent" }
   },
-  "postCreateCommand": "if [ -f package-lock.json ]; then npm ci; else echo 'No lockfile yet; skipping npm ci'; fi",
+  "postCreateCommand": "if [ -f package-lock.json ]; then PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund; else echo 'No lockfile yet; skipping npm ci'; fi",
   "customizations": {
     "vscode": {
       "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]

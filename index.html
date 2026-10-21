@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="icon" href="data:," />
+    <title>Talking Drum VR</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #141210;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      #scene-container {
+        width: 100%;
+        height: 100%;
+      }
+      #xr-hud-controls {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      #enter-vr-button {
+        padding: 12px 24px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: #c86d28;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      }
+      #enter-vr-button:hover {
+        background: #df7b30;
+      }
+      #enter-vr-button:focus-visible {
+        outline: 3px solid #7ee787;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene-container"></div>
+    <div id="xr-hud-controls">
+      <button
+        id="enter-vr-button"
+        data-testid="enter-vr-button"
+        type="button"
+        aria-label="Enter VR (Hand Tracking)"
+      >
+        Enter VR
+      </button>
+    </div>
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>
