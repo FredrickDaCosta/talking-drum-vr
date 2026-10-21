@@ -13,3 +13,8 @@
 - `src/scene-assets/`: Deterministic procedural Three.js `Object3D` prototypes (`talking-drum.scene-asset.ts`).
 - `src/ui/` & `src/debug/`: Diagnostic overlays (`?xrfps=1` FPS overlay, `?debug=1` debug HUD stub).
 - `src/input/`, `src/audio/`, `src/game/`, `src/content/`, `src/platform/`: Reserved for Phase 1+ subsystems.
+
+## Known Follow-Ups for Phase 1
+
+- **Drum Placement, Scale, and Panel Overlap:** In the desktop emulator view, the placeholder drum (`0.5 m` ahead, `0.35 m` below eye level) appears large with its lower edge cropped, and the welcome card overlaps the top of the drum. Both drum scale/placement and welcome panel positioning will be tuned on a real Meta Quest headset.
+- **On-Device Seated Eye-Level Calibration:** Seated eye-level calibration (`PanelSystem`) must be verified on physical headset hardware with a seated user.

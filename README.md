@@ -28,6 +28,7 @@ Append query flags to the local or deployed URL:
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-audit --no-fund
 
 # Start the local HTTPS Vite dev server (https://localhost:8081/talking-drum-vr/)
+# Note: The browser certificate warning on https://localhost:8081 is expected for localhost only (self-signed dev cert required for WebXR).
 npm run dev:runtime
 
 # Run quality checks & production build
