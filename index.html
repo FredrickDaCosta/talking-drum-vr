@@ -33,8 +33,25 @@
         transform: translateX(-50%);
         z-index: 1000;
         display: flex;
-        gap: 12px;
+        flex-direction: column;
+        gap: 10px;
         align-items: center;
+        max-width: min(92vw, 540px);
+      }
+      #vr-status-message {
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid #f0b429;
+        background: rgba(20, 18, 16, 0.95);
+        color: #fff8eb;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.45;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      }
+      #vr-status-message[hidden] {
+        display: none;
       }
       #enter-vr-button {
         padding: 12px 24px;
@@ -59,6 +76,13 @@
   <body>
     <div id="scene-container"></div>
     <div id="xr-hud-controls">
+      <div
+        id="vr-status-message"
+        data-testid="vr-status-message"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
       <button
         id="enter-vr-button"
         data-testid="enter-vr-button"
