@@ -9,7 +9,7 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
     const consoleErrors: string[] = [];
     const failedRequests: string[] = [];
     const badStatusResponses: string[] = [];
-    const requestedUrls: string[] = [];
+    const trackedRequests: import('@playwright/test').Request[] = [];
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
@@ -22,7 +22,7 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
     });
 
     page.on('request', (request) => {
-      requestedUrls.push(request.url());
+      trackedRequests.push(request);
     });
 
     page.on('requestfailed', (request) => {
@@ -44,15 +44,26 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
     const enterVrButton = page.getByRole('button', { name: /enter vr/i });
     await expect(enterVrButton).toBeVisible();
 
-    const allowedOrigins = new Set<string>([new URL(targetUrl).origin, new URL(page.url()).origin]);
+    const finalOrigin = new URL(page.url()).origin;
+    const navRedirectChain = new Set<import('@playwright/test').Request>();
+    let navHop = response?.request() ?? null;
+    while (navHop) {
+      navRedirectChain.add(navHop);
+      navHop = navHop.redirectedFrom();
+    }
 
-    const thirdPartyRequests = requestedUrls.filter((rawUrl) => {
-      if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
-        return false;
-      }
-      const origin = new URL(rawUrl).origin;
-      return !allowedOrigins.has(origin);
-    });
+    const thirdPartyRequests = trackedRequests
+      .filter((req) => {
+        const rawUrl = req.url();
+        if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
+          return false;
+        }
+        if (navRedirectChain.has(req)) {
+          return false;
+        }
+        return new URL(rawUrl).origin !== finalOrigin;
+      })
+      .map((req) => req.url());
 
     expect(
       thirdPartyRequests,
@@ -70,7 +81,7 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
   }) => {
     const consoleErrors: string[] = [];
     const failedRequests: string[] = [];
-    const requestedUrls: string[] = [];
+    const trackedRequests: import('@playwright/test').Request[] = [];
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
@@ -81,7 +92,7 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
       consoleErrors.push(err.message);
     });
     page.on('request', (request) => {
-      requestedUrls.push(request.url());
+      trackedRequests.push(request);
     });
     page.on('requestfailed', (request) => {
       const failure = request.failure()?.errorText ?? 'unknown';
@@ -91,18 +102,31 @@ test.describe('Talking Drum VR — M0 Smoke & E2E Check', () => {
     const separator = targetUrl.includes('?') ? '&' : '?';
     const flaggedUrl = `${targetUrl}${separator}xrfps=1&debug=1`;
 
-    await page.goto(flaggedUrl, { waitUntil: 'networkidle' });
+    const response = await page.goto(flaggedUrl, { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('fps-overlay')).toBeVisible();
     await expect(page.getByTestId('debug-hud')).toBeVisible();
 
-    const allowedOrigins = new Set<string>([new URL(targetUrl).origin, new URL(page.url()).origin]);
-    const thirdPartyRequests = requestedUrls.filter((rawUrl) => {
-      if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
-        return false;
-      }
-      return !allowedOrigins.has(new URL(rawUrl).origin);
-    });
+    const finalOrigin = new URL(page.url()).origin;
+    const navRedirectChain = new Set<import('@playwright/test').Request>();
+    let navHop = response?.request() ?? null;
+    while (navHop) {
+      navRedirectChain.add(navHop);
+      navHop = navHop.redirectedFrom();
+    }
+
+    const thirdPartyRequests = trackedRequests
+      .filter((req) => {
+        const rawUrl = req.url();
+        if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
+          return false;
+        }
+        if (navRedirectChain.has(req)) {
+          return false;
+        }
+        return new URL(rawUrl).origin !== finalOrigin;
+      })
+      .map((req) => req.url());
 
     expect(thirdPartyRequests).toEqual([]);
     expect(failedRequests).toEqual([]);

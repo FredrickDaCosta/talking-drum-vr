@@ -49,7 +49,7 @@ npm run budget:check
 # Repository variables controlling base path, deploy switch, and live smoke URL
 gh variable set DEPLOY_ENABLED --body "true" -R FredrickDaCosta/talking-drum-vr
 gh variable set BASE_PATH --body "/talking-drum-vr/" -R FredrickDaCosta/talking-drum-vr
-gh variable set LIVE_URL --body "https://fredrickdacosta.github.io/talking-drum-vr/" -R FredrickDaCosta/talking-drum-vr
+gh variable set LIVE_URL --body "https://da-costa.online/talking-drum-vr/" -R FredrickDaCosta/talking-drum-vr
 
 # Configure GitHub Pages to deploy from GitHub Actions workflow
 gh api -X POST /repos/FredrickDaCosta/talking-drum-vr/pages -f build_type=workflow
