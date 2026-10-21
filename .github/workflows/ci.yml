@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BASE_PATH: ${{ vars.BASE_PATH || '/talking-drum-vr/' }}
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+  IWSDK_DEV_OPEN: 'false'
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Format check (Prettier)
+        run: npm run format:check
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Unit tests (Vitest)
+        run: npm run test:unit
+
+      - name: Validate scene & UIKitML content
+        run: npm run content:validate
+
+      - name: Production build
+        run: npm run build
+
+      - name: Bundle budget check
+        run: npm run budget:check
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests against built site (vite preview)
+        run: npm run test:e2e

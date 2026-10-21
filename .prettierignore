@@ -1,0 +1,17 @@
+dist/
+node_modules/
+.iwsdk/
+.agents/
+.claude/
+.codex/
+.cursor/
+.github/instructions/
+AGENTS.md
+CLAUDE.md
+public/scenes/AGENTS.md
+public/ui/AGENTS.md
+src/AGENTS.md
+package-lock.json
+coverage/
+playwright-report/
+test-results/
