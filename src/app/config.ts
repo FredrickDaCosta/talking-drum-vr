@@ -42,7 +42,7 @@ export interface AppConfig {
 
 export const APP_CONFIG: AppConfig = {
   appTitle: 'Talking Drum VR',
-  defaultBasePath: '/talking-drum-vr/',
+  defaultBasePath: '/',
   drumPlacement: {
     defaultEyeLevelMeters: 1.6,
     distanceAheadMeters: 0.5,

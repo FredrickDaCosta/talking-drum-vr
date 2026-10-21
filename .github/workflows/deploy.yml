@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BASE_PATH: ${{ vars.BASE_PATH || '/talking-drum-vr/' }}
+  BASE_PATH: ${{ vars.BASE_PATH || '/' }}
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
   IWSDK_DEV_OPEN: 'false'
 
@@ -76,7 +76,7 @@ jobs:
     permissions:
       contents: read
     env:
-      LIVE_URL: ${{ vars.LIVE_URL || needs.deploy.outputs.page_url || 'https://fredrickdacosta.github.io/talking-drum-vr/' }}
+      LIVE_URL: ${{ vars.LIVE_URL || needs.deploy.outputs.page_url || 'https://drum.da-costa.online/' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

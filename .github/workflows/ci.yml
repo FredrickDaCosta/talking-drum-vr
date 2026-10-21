@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BASE_PATH: ${{ vars.BASE_PATH || '/talking-drum-vr/' }}
+  BASE_PATH: ${{ vars.BASE_PATH || '/' }}
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
   IWSDK_DEV_OPEN: 'false'
 

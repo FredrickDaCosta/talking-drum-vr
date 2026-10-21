@@ -37,6 +37,6 @@ describe('APP_CONFIG', () => {
   it('defines seated drum placement 0.5m ahead and 0.35m below eye level', () => {
     expect(APP_CONFIG.drumPlacement.distanceAheadMeters).toBe(0.5);
     expect(APP_CONFIG.drumPlacement.belowEyeLevelMeters).toBe(0.35);
-    expect(APP_CONFIG.defaultBasePath).toBe('/talking-drum-vr/');
+    expect(APP_CONFIG.defaultBasePath).toBe('/');
   });
 });

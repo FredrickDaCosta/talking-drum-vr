@@ -7,7 +7,7 @@ A seated, hands-only WebXR experience that teaches Yoruba tonal patterns through
 - Seated WebXR VR scene requesting `hand-tracking` (zero controller-only paths).
 - Procedural placeholder talking drum positioned `0.5 m` ahead and `0.35 m` below eye level (`[0, 1.25, -0.5]`, recalibrating automatically to actual seated head height on XR entry).
 - Centralised tunables in [`src/app/config.ts`](src/app/config.ts) and URL query flag parser in [`src/app/flags.ts`](src/app/flags.ts).
-- Sub-path safe asset resolution via `BASE_PATH` (default `/talking-drum-vr/`) and `import.meta.env.BASE_URL`.
+- Configurable asset resolution via `BASE_PATH` (default `/`) and `import.meta.env.BASE_URL`, deployed at [`https://drum.da-costa.online/`](https://drum.da-costa.online/).
 
 ## URL Query Flags
 
@@ -27,7 +27,7 @@ Append query flags to the local or deployed URL:
 # Install dependencies without downloading Playwright browsers locally
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-audit --no-fund
 
-# Start the local HTTPS Vite dev server (https://localhost:8081/talking-drum-vr/)
+# Start the local HTTPS Vite dev server (https://localhost:8081/)
 # Note: The browser certificate warning on https://localhost:8081 is expected for localhost only (self-signed dev cert required for WebXR).
 npm run dev:runtime
 
@@ -46,9 +46,9 @@ npm run budget:check
 | Script                     | Description                                                                            |
 | -------------------------- | -------------------------------------------------------------------------------------- |
 | `npm run dev`              | Start IWSDK dev server (`--no-open` so no managed Chromium is launched)                |
-| `npm run dev:runtime`      | Start Vite HTTPS dev server on `https://localhost:8081/talking-drum-vr/`               |
-| `npm run build`            | Production build to `dist/` (uses `BASE_PATH`, default `/talking-drum-vr/`)            |
-| `npm run preview`          | Serve `dist/` locally on `http://localhost:4173/talking-drum-vr/`                      |
+| `npm run dev:runtime`      | Start Vite HTTPS dev server on `https://localhost:8081/`                               |
+| `npm run build`            | Production build to `dist/` (uses `BASE_PATH`, default `/`)                            |
+| `npm run preview`          | Serve `dist/` locally on `https://localhost:4173/`                                     |
 | `npm run lint`             | Run ESLint (flat config) across TypeScript sources and tests                           |
 | `npm run format:check`     | Verify code formatting with Prettier                                                   |
 | `npm run typecheck`        | Run strict TypeScript check (`tsc --noEmit`)                                           |
