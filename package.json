@@ -30,7 +30,7 @@
     "three": "npm:super-three@0.181.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.22.0",
+    "@eslint/js": "^10.0.1",
     "@iwsdk/cli": "1.0.1",
     "@iwsdk/reference": "1.0.1",
     "@iwsdk/vite-plugin-dev": "1.0.1",
