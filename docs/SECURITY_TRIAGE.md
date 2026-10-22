@@ -1,7 +1,7 @@
 # Security Triage (`docs/SECURITY_TRIAGE.md`)
 
-> **Status:** Read-only triage on branch `chore/security-triage`, taken against `main` at
-> `acf8a8f`, 2026-10-22. No fix has been applied to the repo. Every fix below needs CTO approval.
+> **Status:** CLOSED 2026-10-22. The triage (§1–§6) was taken against `main` at `acf8a8f`. The CTO approved
+> fixes 1–4, and they are merged and deployed. Outcomes are in §7. Sections 1–6 are kept as written at triage time.
 
 ## 1. Data sources and limitations
 
@@ -130,3 +130,41 @@ Note on local tooling: the session image's npm 10.9.4 crashes with
 `Cannot read properties of null (reading 'edgesOut')` when changing `vitest` in this tree. npm 11
 (the npm bundled with Node 24, which CI uses) installs cleanly, so lockfile regeneration should use
 npm 11.
+
+## 7. Outcomes (2026-10-22)
+
+| Fix                                     | PR                  | Merge SHA | Result                                                                                                                        |
+| --------------------------------------- | ------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1. `sharp` override `0.35.4` → `0.35.5` | #14 (with this doc) | `754ab59` | GHSA-wq5f cleared. Lockfile: 27 version bumps (`sharp` + `@img/sharp-*`), 0 added/removed. dist sha256 identical.             |
+| 2. `vitest` `^3.0.8` → `^4.1.12`        | #15                 | `94efaf2` | tinypool ×2 and @vitest/mocker ×2 cleared. `npm audit`: **found 0 vulnerabilities**. Unit tests 36/36. dist sha256 identical. |
+| 3. Close Dependabot #3–#7               | n/a                 | n/a       | #3, #4, #5 closed as superseded by #15. #6 and #7 closed with their reasons. None merged.                                     |
+| 4. `.github/dependabot.yml`             | #16                 | `d26bc0b` | Majors ignored for version updates only. Minor and patch grouped. Validated against the SchemaStore schema.                   |
+
+Every merge had CI and CodeQL green on the PR head and on `main`. Each Deploy live smoke passed 5/5.
+Bundle sizes stayed at 0.831 MB gzip initial-load JS and 3.778 MB dist.
+
+**Real alert count:** still UNVERIFIED. The alerts API still returns `403 Resource not accessible by
+integration`, so the GitHub Security tab must be read by a human. Expected: 0 open alerts, because
+`npm audit` reports 0 vulnerabilities on `main`.
+
+**Ignore rules and security updates:** I could not fetch docs.github.com from the agent environment
+(DNS/proxy). Search-result summaries of GitHub's [Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)
+and [Controlling which dependencies are updated](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/controlling-dependencies-updated)
+state that `update-types` affects version updates only, while bare `dependency-name` or `versions`
+rules also block security updates. Every rule in the config therefore names one dependency and lists
+`version-update:*` types.
+
+**First Dependabot runs on the new config:** runs 39869453489 (npm) and 39869453473 (actions) both succeeded. Observed in the npm job log:
+
+- Each ignore condition is logged as `version-update:semver-major - from .github/dependabot.yml`.
+- `vite`, `vitest`, `@types/node` and `@types/three`: `All updates for … were ignored`.
+- Group `npm-minor-patch`: `Nothing to update`.
+- **`three` (the alias `npm:super-three@0.181.0`) is not checked at all.** 19 direct
+  dependencies are checked and `three` is the only one missing. The `three` and `super-three` entries
+  are therefore inert today. Dependabot will not propose three updates, so they must be bumped manually.
+- **New major-bump PRs** were opened for packages outside the ignore list: #17 `@eslint/js` 10,
+  #18 `typescript` 7 and #19 `eslint` 10. None is merged. Awaiting the CTO's decision.
+
+**Known flake (not caused by these changes):** the IWER hand-strike e2e test
+(`smoke.spec.ts:213`) failed once locally (`strike count` 0, expected 1) and passed on retry. It
+passed in all later local runs and in every CI and live-smoke run. dist was byte-identical at the time.
