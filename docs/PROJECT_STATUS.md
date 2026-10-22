@@ -7,14 +7,15 @@
 
 ## Current Stage
 
-**Security triage (read-only)** — branch `chore/security-triage` (not merged). Implementation handed
-from Antigravity to Claude Code (cloud session); the CTO/PM writes the task prompts.
+**Security triage CLOSED. M1c ON HOLD**, pending Fredrick's hands-in-emulator test of M1b. Implementation
+was handed from Antigravity to Claude Code (cloud session); the CTO/PM writes the task prompts.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
 - **M1b:** Merged in PR #13 (`acf8a8f`) and deployed (Deploy run 39779468627, live smoke 5/5).
   Merge ACCEPTED by CTO. Fredrick's hands-in-emulator test is still pending.
-- **Security triage:** Findings in `docs/SECURITY_TRIAGE.md`. Awaiting the CTO's decision on the fix plan.
+- **Security triage:** Closed. Fixes merged and deployed in #14 (`754ab59`), #15 (`94efaf2`) and #16 (`d26bc0b`).
+  `npm audit`: 0 vulnerabilities. See `docs/SECURITY_TRIAGE.md` §7.
 - **M1c:** NOT started — wait for the CTO's M1c prompt (`DrumAudio`, latency probe, loading banner,
   controller-only message, player-rig transform safeguard, ASSET_REGISTER entry, M1 close → tag `m1`).
 
@@ -65,15 +66,15 @@ from Antigravity to Claude Code (cloud session); the CTO/PM writes the task prom
       _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_
 - [ ] M1 close — verify full DoD (`voicesStartedCount ≥ 1`, all gates green, live smoke).
 
-### Dependabot / security (see `docs/SECURITY_TRIAGE.md`)
+### Dependabot / security (see `docs/SECURITY_TRIAGE.md` §7)
 
-- 5 advisories, all dev-only, none in `dist/`: tinypool ×2 (critical), sharp GHSA-wq5f (high),
-  vitest/@vitest/mocker ×2 (moderate).
-- sharp security PR fails because of the exact override `"sharp": "0.35.4"` (job log evidence in triage doc);
-  proposed fix is `0.35.5` (patch).
-- vitest: proposed `^4.1.12` (major, needs approval) instead of #3/#4/#5 (`^5.0.5`, all identical).
-- #6 (`@types/node` 26) and #7 (vite 8, CI `ERESOLVE` against `@iwsdk/vite-plugin-dev` peer `vite ^7`) carry no security fix.
-- **Never merge #3–#7.** Awaiting CTO decision on the ranked fix plan and the proposed `dependabot.yml`.
+- Done: sharp `0.35.5` (#14), vitest `^4.1.12` (#15), `dependabot.yml` ignore-majors (version updates only)
+  plus minor/patch groups (#16). #3–#7 closed, none merged. `npm audit`: 0 vulnerabilities.
+- [ ] Fredrick: read the GitHub Security tab and confirm the open Dependabot alert count (the API returns 403 to the agent).
+- [ ] CTO decision: new Dependabot major PRs #17 (`@eslint/js` 10), #18 (`typescript` 7), #19 (`eslint` 10).
+      Close them, or add ignore rules? Do not merge without approval.
+- Note: Dependabot does not check the aliased `three` (`npm:super-three`), so three updates are manual.
+- Known flake: IWER hand-strike e2e (`smoke.spec.ts:213`) failed once locally and passed on retry. Watch it in M1c.
 
 ### Physical Meta Quest Verification (Post-M1)
 
