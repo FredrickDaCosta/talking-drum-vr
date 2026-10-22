@@ -25,14 +25,14 @@
 
 ### 1.1 What CI Automated E2E Proves vs. What Requires a Physical Headset
 
-| Verification Target | Proven by CI (Vitest + Playwright with Injected IWER)? | Requires Manual Emulator / Physical Meta Quest? |
-| --- | --- | --- |
-| Pure math (`OneEuroFilter3D` lag $\le 1$ frame, `detectStrike` speed/radius/debounce/approach-travel gates, `HandTracker` transforms) | **Yes** (`npm run test:unit`, 36/36 tests) | No |
-| Runtime `talking-drum` world quaternion & `30°` tilted top-head world normal `(0, 0.866, 0.5)` | **Yes** (`tests/e2e/smoke.spec.ts`) | No |
-| End-to-end `XRFrame.getJointPose` $\rightarrow$ `HandTracker` $\rightarrow$ `StrikeDetector` $\rightarrow$ `StrikeSystem` $\rightarrow$ `DebugHud` strike count & rejection of slow descent / rim miss / plane jitter | **Yes** (`tests/e2e/smoke.spec.ts` with scripted IWER right hand) | No |
-| Zero console errors and zero third-party network requests before and during XR hand/controller sessions | **Yes** (`tests/e2e/smoke.spec.ts`) | No |
-| Chrome extension UI workflow for switching Immersive Web Emulator (`v2.0.0`) between controllers and hands on `https://drum.da-costa.online/` | **No** (CI injects `iwer` programmatically via `addInitScript`) | **Yes** (Fredrick manual emulator checklist below) |
-| Real optical hand-tracking noise, self-occlusion, palm vs. fingertip ergonomics, and physical seated reach at `0.50 m` | **No** | **Yes** (Physical Meta Quest headset) |
+| Verification Target                                                                                                                                                                                                   | Proven by CI (Vitest + Playwright with Injected IWER)?            | Requires Manual Emulator / Physical Meta Quest?    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------- |
+| Pure math (`OneEuroFilter3D` lag $\le 1$ frame, `detectStrike` speed/radius/debounce/approach-travel gates, `HandTracker` transforms)                                                                                 | **Yes** (`npm run test:unit`, 36/36 tests)                        | No                                                 |
+| Runtime `talking-drum` world quaternion & `30°` tilted top-head world normal `(0, 0.866, 0.5)`                                                                                                                        | **Yes** (`tests/e2e/smoke.spec.ts`)                               | No                                                 |
+| End-to-end `XRFrame.getJointPose` $\rightarrow$ `HandTracker` $\rightarrow$ `StrikeDetector` $\rightarrow$ `StrikeSystem` $\rightarrow$ `DebugHud` strike count & rejection of slow descent / rim miss / plane jitter | **Yes** (`tests/e2e/smoke.spec.ts` with scripted IWER right hand) | No                                                 |
+| Zero console errors and zero third-party network requests before and during XR hand/controller sessions                                                                                                               | **Yes** (`tests/e2e/smoke.spec.ts`)                               | No                                                 |
+| Chrome extension UI workflow for switching Immersive Web Emulator (`v2.0.0`) between controllers and hands on `https://drum.da-costa.online/`                                                                         | **No** (CI injects `iwer` programmatically via `addInitScript`)   | **Yes** (Fredrick manual emulator checklist below) |
+| Real optical hand-tracking noise, self-occlusion, palm vs. fingertip ergonomics, and physical seated reach at `0.50 m`                                                                                                | **No**                                                            | **Yes** (Physical Meta Quest headset)              |
 
 ---
 
@@ -45,7 +45,7 @@
 
 ### 2.1 Automated CI, Deploy, and Live Smoke Evidence (M0)
 
-- **Live URL (Historical M0 Origin):** `https://fredrickdacosta.github.io/talking-drum-vr/` *(now `301` redirects to `https://drum.da-costa.online/`)*
+- **Live URL (Historical M0 Origin):** `https://fredrickdacosta.github.io/talking-drum-vr/` _(now `301` redirects to `https://drum.da-costa.online/`)_
 - **Initial M0 Deploy & Live Smoke (`#1`):**
   - Run: `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39653130114`
   - `Build & Deploy Pages`: `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39653130114/job/119406369492` (`success`)
@@ -59,7 +59,7 @@
 
 ### 2.2 Manual Immersive Web Emulator Check (`2026-10-21`, Historical Origin)
 
-- **Target URL tested (M0):** `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1` *(historical origin; now redirects `301` to `https://drum.da-costa.online/` — must be rerun on `https://drum.da-costa.online/?xrfps=1&debug=1`)*
+- **Target URL tested (M0):** `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1` _(historical origin; now redirects `301` to `https://drum.da-costa.online/` — must be rerun on `https://drum.da-costa.online/?xrfps=1&debug=1`)_
 - **Environment:** Desktop Chrome with the **Immersive Web Emulator** extension (`v2.0.0`, site access set to `"On all sites"`).
 - **Result:** **PASS** (for M0 `Enter VR` session lifecycle and clean console on the historical origin).
   - Clicking **Enter VR** started the immersive WebXR session cleanly.
@@ -70,7 +70,7 @@
 
 ### 2.3 Desktop Chrome Performance Baseline (Pre-Loading-Screen Reference)
 
-Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1` *(historical M0 URL; now redirects `301` to `https://drum.da-costa.online/`)* in desktop Chrome:
+Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1` _(historical M0 URL; now redirects `301` to `https://drum.da-costa.online/`)_ in desktop Chrome:
 
 | Metric                              | Baseline Value | Notes                                                                                |
 | ----------------------------------- | -------------- | ------------------------------------------------------------------------------------ |
@@ -91,7 +91,7 @@ Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1`
 1. **New-Origin Extension Access & Load Check:**
    - Open `https://drum.da-costa.online/?xrfps=1&debug=1` in desktop Chrome with the **Immersive Web Emulator (`v2.0.0`)** extension enabled (confirm extension site access is allowed on `https://drum.da-costa.online`).
    - Confirm the tilted talking drum is fully visible (no lower-edge cropping) and the welcome panel sits cleanly above the drum: `[ ___ ]`
-   - Initial `#xr-debug-hud` text before entering VR: `[ ___ ]` *(expected: `DEBUG HUD | hand(right): UNTRACKED | skin: n/a | strikes: 0 | speed: 0.00m/s | radial: 0.000m`)*
+   - Initial `#xr-debug-hud` text before entering VR: `[ ___ ]` _(expected: `DEBUG HUD | hand(right): UNTRACKED | skin: n/a | strikes: 0 | speed: 0.00m/s | radial: 0.000m`)_
 2. **Enter VR on New Origin (`https://drum.da-costa.online/`):**
    - Click **Enter VR** (`#enter-vr-button`).
    - Does the session start and switch the button to **Exit VR**? `[ ___ ]`

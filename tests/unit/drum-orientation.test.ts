@@ -13,8 +13,7 @@ describe('talking-drum geometry single source of truth & 30 deg tilt orientation
   it('shares halfLengthMeters (0.19 m) and headRadiusMeters (0.11 m) between APP_CONFIG and talkingDrumAsset with no baked rotation', () => {
     const expectedHalfLength = APP_CONFIG.drumGeometry.lengthMeters / 2;
     const recordedGeometry = talkingDrumAsset.userData.drumGeometry as
-      | { lengthMeters: number; halfLengthMeters: number; headRadiusMeters: number }
-      | undefined;
+      { lengthMeters: number; halfLengthMeters: number; headRadiusMeters: number } | undefined;
 
     expect(recordedGeometry).toBeDefined();
     expect(recordedGeometry?.lengthMeters).toBe(APP_CONFIG.drumGeometry.lengthMeters);
@@ -45,11 +44,7 @@ describe('talking-drum geometry single source of truth & 30 deg tilt orientation
 
     const drumNode = sceneDoc.nodes.find((node) => node.id === 'talking-drum');
     expect(drumNode).toBeDefined();
-    expect(drumNode?.transform?.rotationDeg).toEqual([
-      APP_CONFIG.drumPlacement.drumTiltDeg,
-      0,
-      0,
-    ]);
+    expect(drumNode?.transform?.rotationDeg).toEqual([APP_CONFIG.drumPlacement.drumTiltDeg, 0, 0]);
   });
 
   it('computes the top-head normal from drumTiltDeg = 30 deg as (0, 0.8660254, 0.5)', () => {

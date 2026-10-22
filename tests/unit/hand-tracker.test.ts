@@ -21,24 +21,7 @@ function buildTiltedDrumInverseMatrixElements(
   const ty = -(drumCenter.y * c + drumCenter.z * s);
   const tz = drumCenter.y * s - drumCenter.z * c;
 
-  return new Float32Array([
-    1,
-    0,
-    0,
-    0,
-    0,
-    c,
-    -s,
-    0,
-    0,
-    s,
-    c,
-    0,
-    tx,
-    ty,
-    tz,
-    1,
-  ]);
+  return new Float32Array([1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, tx, ty, tz, 1]);
 }
 
 describe('HandTracker pure helpers & adapter', () => {
@@ -188,12 +171,7 @@ describe('HandTracker pure helpers & adapter', () => {
       strike: { ...APP_CONFIG.strike, strikePointMode: 'index-finger-tip' },
     };
     const tipTracker = new HandTracker(tipConfig);
-    const sTip = tipTracker.sampleHandFromJoints(
-      'right',
-      { indexFingerTip: p0 },
-      invElements,
-      0,
-    );
+    const sTip = tipTracker.sampleHandFromJoints('right', { indexFingerTip: p0 }, invElements, 0);
     expect(sTip.quality).toBe('TRACKED');
     expect(sTip.strikeLocal.y).toBeCloseTo(0.25, 5);
   });

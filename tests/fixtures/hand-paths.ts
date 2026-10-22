@@ -150,7 +150,11 @@ export function buildJitterAtPlanePath(): HandStrikeSample[] {
  */
 export function buildQuickTapFromAbovePath(): HandStrikeSample[] {
   return [
-    { timeMs: 7000, hand: 'right', localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + 0.03, z: 0.0 } },
+    {
+      timeMs: 7000,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + 0.03, z: 0.0 },
+    },
     {
       timeMs: 7000 + FRAME_INTERVAL_72HZ_MS,
       hand: 'right',

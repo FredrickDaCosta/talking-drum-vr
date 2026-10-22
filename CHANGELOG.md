@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 
 - **Date:** `2026-10-21`
 - **Tag:** `m0`
-- **Live URL (Historical M0 Origin):** `https://fredrickdacosta.github.io/talking-drum-vr/` *(Note: this was the live `github.io` URL at the time M0 closed; it now returns an `HTTP 301` redirect to `https://drum.da-costa.online/`.)*
+- **Live URL (Historical M0 Origin):** `https://fredrickdacosta.github.io/talking-drum-vr/` _(Note: this was the live `github.io` URL at the time M0 closed; it now returns an `HTTP 301` redirect to `https://drum.da-costa.online/`.)_
 - **Toolchain & Core Versions:**
   - **Node.js:** `v24.14.1` (`npm 11.17.0`, `"engines": { "node": ">=20.19" }`)
   - **IWSDK (`@iwsdk/core`, `@iwsdk/cli`, `@iwsdk/vite-plugin-dev`):** `1.0.1`
