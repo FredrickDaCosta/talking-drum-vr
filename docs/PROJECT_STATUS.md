@@ -7,14 +7,16 @@
 
 ## Current Stage
 
-**Stage M1b** — active on branch `feat/m1b-drum-hands-wiring`
+**Security triage (read-only)** — branch `chore/security-triage` (not merged). Implementation handed
+from Antigravity to Claude Code (cloud session); the CTO/PM writes the task prompts.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
-- **M1b:** PR #13 open — awaiting Fredrick's approval. All local and CI gates green.
-  No audio (M1c scope).
-- **M1c:** Next after M1b merges — `DrumAudio`, latency probe, loading banner,
-  controller-only guidance message, M1 close.
+- **M1b:** Merged in PR #13 (`acf8a8f`) and deployed (Deploy run 39779468627, live smoke 5/5).
+  Merge ACCEPTED by CTO. Fredrick's hands-in-emulator test is still pending.
+- **Security triage:** Findings in `docs/SECURITY_TRIAGE.md`. Awaiting the CTO's decision on the fix plan.
+- **M1c:** NOT started — wait for the CTO's M1c prompt (`DrumAudio`, latency probe, loading banner,
+  controller-only message, player-rig transform safeguard, ASSET_REGISTER entry, M1 close → tag `m1`).
 
 ---
 
@@ -43,7 +45,7 @@
 | Strike thresholds    | `minDownwardSpeedMetersPerSec: 0.30`, `minApproachTravelMeters: 0.02 m`, `approachWindowMs: 150 ms`, `debounceMs: 90 ms`, `hitRadiusMarginMeters: 0.01 m`, `rearmDistanceMeters: 0.008 m` | Tuned in `src/app/config.ts`; micro-taps < 2 cm wind-up will not register (documented trade-off) |
 | 0.61 m reach rule    | Drum at `distanceAheadMeters: 0.50 m`, tilted top-head centre at `[0, 1.4145, -0.4050]` = `0.4454 m` 3D Euclidean from `[0, 1.6, 0]`                                                      | Satisfies 2 ft (0.61 m) contest reach limit                                                      |
 | Left hand role       | `allowSecondaryHand: false` — left hand **reserved for Phase 2 under-arm tension-cord pitch-squeeze**                                                                                     | Prevents accidental left-hand drumhead strikes while squeezing                                   |
-| Merge rules          | Fredrick approves each stage PR by pasting the stage prompt; Antigravity does NOT self-merge                                                                                              | Explicit human approval gate per stage                                                           |
+| Merge rules          | Claude Code may merge, deploy and verify only work the CTO has approved in writing, and only with CI + CodeQL green; unapproved work → open PR and stop. Never merge Dependabot PRs #3–#7 | Explicit written approval gate per task                                                          |
 | Strike point default | `strikePointMode: 'palm'` (midpoint of wrist + middle-finger-metacarpal)                                                                                                                  | Index-finger-tip available as config option; final choice after physical Quest testing           |
 | Drum axis convention | Long axis `+Y` in asset-local space; world tilt via scene `rotationDeg: [30, 0, 0]` (not baked in asset)                                                                                  | Single source of truth; `drum-orientation.test.ts` enforces no baked rotation                    |
 
@@ -63,12 +65,15 @@
       _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_
 - [ ] M1 close — verify full DoD (`voicesStartedCount ≥ 1`, all gates green, live smoke).
 
-### Dependabot sharp task
+### Dependabot / security (see `docs/SECURITY_TRIAGE.md`)
 
-- Sharp `0.32.x` → `0.35.4` pinned in `package.json` `overrides` (satisfies 2 critical advisories).
-- 5 open Dependabot PRs (vite 8.3.4, vitest 5.0.5, @types/node 26.6.5, and two
-  `npm_and_yarn` multi groups) — **all major bumps, do not merge until M1c closes**.
-- After M1c: triage each PR; confirm tests green; merge or close superseded duplicates.
+- 5 advisories, all dev-only, none in `dist/`: tinypool ×2 (critical), sharp GHSA-wq5f (high),
+  vitest/@vitest/mocker ×2 (moderate).
+- sharp security PR fails because of the exact override `"sharp": "0.35.4"` (job log evidence in triage doc);
+  proposed fix is `0.35.5` (patch).
+- vitest: proposed `^4.1.12` (major, needs approval) instead of #3/#4/#5 (`^5.0.5`, all identical).
+- #6 (`@types/node` 26) and #7 (vite 8, CI `ERESOLVE` against `@iwsdk/vite-plugin-dev` peer `vite ^7`) carry no security fix.
+- **Never merge #3–#7.** Awaiting CTO decision on the ranked fix plan and the proposed `dependabot.yml`.
 
 ### Physical Meta Quest Verification (Post-M1)
 
