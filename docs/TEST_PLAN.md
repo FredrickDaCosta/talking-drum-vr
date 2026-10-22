@@ -85,8 +85,9 @@ Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1`
 
 ## 3. Fredrick Manual Emulator Test Checklist (`https://drum.da-costa.online/`)
 
-> [!WARNING]
-> **Hand-Tracking Extension UI Steps Still `UNVERIFIED`:** Because the exact on-page toolbar labels in the **Immersive Web Emulator Chrome extension (`v2.0.0`)** for switching from Controllers to Hand Tracking have not yet been verified on a live desktop session, the hand-tracking UI steps below are marked **`UNVERIFIED`** and include blanks (`[ ___ ]`) for Fredrick to fill in what he sees.
+> [!NOTE]
+> **M1b emulator check: VERIFIED by Fredrick (2026-10-22)** on `https://drum.da-costa.online/?xrfps=1&debug=1`. Results are in §3.1. The M1c audio checklist is in §3.2.
+> Real-Quest feel, strike thresholds and audio latency remain **UNVERIFIED** until tested on a headset.
 
 1. **New-Origin Extension Access & Load Check:**
    - Open `https://drum.da-costa.online/?xrfps=1&debug=1` in desktop Chrome with the **Immersive Web Emulator (`v2.0.0`)** extension enabled (confirm extension site access is allowed on `https://drum.da-costa.online`).
@@ -96,7 +97,7 @@ Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1`
    - Click **Enter VR** (`#enter-vr-button`).
    - Does the session start and switch the button to **Exit VR**? `[ ___ ]`
    - Any red errors in Chrome DevTools Console? `[ ___ ]`
-3. **Switch Emulator Input Mode from Controllers to Hands (`UNVERIFIED` UI Steps):**
+3. **Switch Emulator Input Mode from Controllers to Hands (verified: the toolbar input-mode icon):**
    - Locate the Immersive Web Emulator (`v2.0.0`) on-page toolbar / panel.
    - Exact control / toggle label used to switch from Controllers to Hands: `[ ___ ]`
    - Do the local white-outlined hand meshes appear and does `hand(right):` in `#xr-debug-hud` change from `UNTRACKED` to `TRACKED` (or `EMULATED`)? `[ ___ ]`
@@ -104,3 +105,29 @@ Measured on `https://fredrickdacosta.github.io/talking-drum-vr/?xrfps=1&debug=1`
    - Move the emulated right hand above the tilted top drumhead (`skin:` shows a positive distance $\ge +0.020\text{m}$) and move it briskly downward through the drumhead centre.
    - Observed `#xr-debug-hud` readout after strike (`strikes`, `speed`, `radial`): `[ ___ ]`
    - Observed informational FPS in `#xr-fps-overlay` (note only, not pass/fail): `[ ___ ]`
+
+### 3.1 M1b Results (Fredrick, Immersive Web Emulator, 2026-10-22): VERIFIED
+
+| Check                                    | Result                                                                                          |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Switch Controllers → Hands               | The **input-mode icon** on the emulator's on-page toolbar switches hand mode on                 |
+| Right-hand state                         | `hand(right): TRACKED`                                                                          |
+| Fast strikes through the cream drum head | Register. The counter reached **21**; last hit **3.03 m/s**, radial **0.107 m** (inside 0.12 m) |
+| Slow passes                              | Do not register                                                                                 |
+| Rim miss                                 | **Not observed by hand** (covered by the scripted e2e rim-miss case only)                       |
+| Console                                  | No red errors; only Three.js / shader warnings                                                  |
+| Real-Quest feel, thresholds, latency     | **UNVERIFIED** (needs a physical headset)                                                       |
+
+### 3.2 M1c Audio Checklist (Fredrick, after the M1c PR is deployed)
+
+Open `https://drum.da-costa.online/?xrfps=1&debug=1`, click **Enter VR**, and switch the emulator to hands.
+
+1. Before any click, the second HUD line reads `software + audio buffer estimate … | audio no-context | voices 0`: `[ ___ ]`
+2. After Enter VR, the HUD shows `audio running`: `[ ___ ]`
+3. A fast strike plays an audible drum tone, and harder strikes sound louder: `[ ___ ]`
+4. Slow passes stay silent: `[ ___ ]`
+5. The `pipeline … ms`, `base … ms` and `out … ms` (or `n/a`) values after a strike: `[ ___ ]`
+   _(software + audio-buffer estimate only; NOT hand-tracking or end-to-end latency)_
+6. Switch the emulator back to controllers. After about 3 s, the status shows _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_ It clears when hands return: `[ ___ ]`
+7. On first load, the "Loading Talking Drum VR…" banner appears briefly and then disappears: `[ ___ ]`
+8. Any red console errors: `[ ___ ]`

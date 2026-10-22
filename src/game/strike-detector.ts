@@ -26,8 +26,10 @@ export interface DrumHit {
 export interface InternalStrikeEvent {
   readonly hit: DrumHit;
   readonly hand: Handedness;
-  /** performance.now() timestamp captured at XR frame entry for software pipeline latency. */
+  /** World clock timestamp of the frame that produced the hit (ms); drives detector timing. */
   readonly frameTimestampMs: number;
+  /** performance.now() at StrikeSystem.update() entry; debug software-pipeline probe only. */
+  readonly frameEntryPerfNowMs: number;
 }
 
 /**

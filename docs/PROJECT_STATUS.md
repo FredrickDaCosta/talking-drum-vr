@@ -7,17 +7,20 @@
 
 ## Current Stage
 
-**Security triage CLOSED. M1c ON HOLD**, pending Fredrick's hands-in-emulator test of M1b. Implementation
-was handed from Antigravity to Claude Code (cloud session); the CTO/PM writes the task prompts.
+**Stage M1c: IN REVIEW** on branch `feat/m1c-drum-audio`. The PR is open; do NOT merge until the CTO
+approves in writing. Implementation was handed from Antigravity to Claude Code (cloud session); the CTO/PM
+writes the task prompts.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
 - **M1b:** Merged in PR #13 (`acf8a8f`) and deployed (Deploy run 39779468627, live smoke 5/5).
-  Merge ACCEPTED by CTO. Fredrick's hands-in-emulator test is still pending.
+  Merge ACCEPTED by CTO. **Emulator-VERIFIED by Fredrick 2026-10-22** (`docs/TEST_PLAN.md §3.1`):
+  hand mode via the toolbar input-mode icon, `TRACKED`, 21 strikes, slow passes ignored, no red errors.
+  Rim-miss was not observed by hand. Real-Quest feel, thresholds and latency are UNVERIFIED.
 - **Security triage:** Closed. Fixes merged and deployed in #14 (`754ab59`), #15 (`94efaf2`) and #16 (`d26bc0b`).
   `npm audit`: 0 vulnerabilities. See `docs/SECURITY_TRIAGE.md` §7.
-- **M1c:** NOT started — wait for the CTO's M1c prompt (`DrumAudio`, latency probe, loading banner,
-  controller-only message, player-rig transform safeguard, ASSET_REGISTER entry, M1 close → tag `m1`).
+- **M1c:** Implemented on `feat/m1c-drum-audio` and awaiting CTO review. After approval: merge, deploy,
+  live smoke, then M1 close (tag `m1`, not `v*`).
 
 ---
 
@@ -54,17 +57,30 @@ was handed from Antigravity to Claude Code (cloud session); the CTO/PM writes th
 
 ## Open Tasks
 
-### M1c (Next PR — `feat/m1c-drum-audio`)
+### M1c (`feat/m1c-drum-audio`, in review)
 
-- [ ] `DrumAudio` (`src/audio/drum-audio.ts`) — `OfflineAudioContext` _gángan_ placeholder,
-      `play({ velocity, pitchRatio })`, `voicesStartedCount`, gain curve.
-- [ ] `DebugHud` latency probe — `software pipeline: X.XX ms` and
-      `audio buffer estimate (not tracking latency): base X.X ms | out X.X ms (or n/a)`.
-- [ ] Startup loading banner — `#app-loading-banner` (`role="status"`) visible at first paint,
-      hidden on `World.create()` resolve, plain error on reject.
-- [ ] Controller-only XR guidance message —
-      _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_
-- [ ] M1 close — verify full DoD (`voicesStartedCount ≥ 1`, all gates green, live smoke).
+- [x] `DrumAudio` (`src/audio/drum-audio.ts`): one lazy `AudioContext`, unlocked in the Enter VR click and on
+      the first page gesture (`src/audio/audio-unlock.ts`). The procedural _gángan_ placeholder is rendered via
+      `OfflineAudioContext` (`src/audio/gangan-placeholder.ts`). `play({ velocity, pitchRatio = 1 })` maps
+      0.30–3.0 m/s to v, then g = 0.15 + 0.85·v^0.75. pitchRatio drives playbackRate (clamped 0.5–2). HRTF
+      panner at the drum head, listener on the player head, pooled voice gains. Wired via `DrumAudioSystem` →
+      `StrikeSystem.onStrike`.
+- [x] Latency probe (`?debug=1`, HUD line 2): "software + audio buffer estimate (not tracking / end-to-end
+      latency)", showing the pipeline (StrikeSystem frame entry → play()), base/out latency or `n/a`, audio
+      state and voice count.
+- [x] Loading banner `#app-loading-banner`: static HTML, removed when startup resolves, plain error message on
+      failure (`src/app/loading-banner.ts`).
+- [x] Controller-only / no-hands XR notice after a 3 s grace period with no tracked hand
+      (`src/platform/xr-input-notice.ts`, `PanelSystem`).
+- [x] Player-rig transform safeguard: hand poses (reference space = rig-local) are mapped by
+      `inverse(drumWorld) × playerWorld` (`src/input/reference-space.ts`). No-op at an identity rig. Inferred
+      scope: the CTO prompt was truncated.
+- [x] ASSET_REGISTER entry for the procedural placeholder.
+- [x] E2E hand-strike flake root-caused: headless SwiftShader frames of 180–200 ms make the scripted strike
+      slower than 0.30 m/s. The test now retries only measured slow-frame attempts.
+- [ ] Fredrick: M1c audio checklist (`docs/TEST_PLAN.md §3.2`) after deploy.
+- [ ] M1 close (after CTO approval, merge, deploy and live smoke): tag `m1`, CHANGELOG release entry.
+- Real-Quest audio latency, loudness feel and HRTF placement: **UNVERIFIED**.
 
 ### Dependabot / security (see `docs/SECURITY_TRIAGE.md` §7)
 
@@ -74,7 +90,7 @@ was handed from Antigravity to Claude Code (cloud session); the CTO/PM writes th
 - [ ] CTO decision: new Dependabot major PRs #17 (`@eslint/js` 10), #18 (`typescript` 7), #19 (`eslint` 10).
       Close them, or add ignore rules? Do not merge without approval.
 - Note: Dependabot does not check the aliased `three` (`npm:super-three`), so three updates are manual.
-- Known flake: IWER hand-strike e2e (`smoke.spec.ts:213`) failed once locally and passed on retry. Watch it in M1c.
+- E2E flake: root-caused and handled in M1c (see the M1c section above).
 
 ### Physical Meta Quest Verification (Post-M1)
 

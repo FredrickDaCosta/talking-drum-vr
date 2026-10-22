@@ -7,6 +7,9 @@ const defaultPreviewUrl = `https://localhost:4173${normalizedBasePath.endsWith('
 const targetUrl = process.env.LIVE_URL ?? defaultPreviewUrl;
 const iwerBundlePath = path.resolve(process.cwd(), 'node_modules/iwer/build/iwer.min.js');
 
+const EXPECTED_CONTROLLERS_ONLY_MESSAGE =
+  'Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum.';
+
 const EXPECTED_VR_UNAVAILABLE_MESSAGE =
   "VR isn't available in this browser. Open this page in Meta Quest Browser, or on a desktop use the Immersive Web Emulator extension.";
 
@@ -74,7 +77,24 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     const response = await page.goto(targetUrl, { waitUntil: 'networkidle' });
     expect(response?.status()).toBeLessThan(400);
 
+    // Loading banner ships in the static HTML (visible at first paint, before any JS runs)...
+    const initialHtml = (await response?.text()) ?? '';
+    expect(initialHtml).toMatch(/<div[^>]*id="app-loading-banner"[^>]*role="status"/);
+    expect(initialHtml).toContain('Loading Talking Drum VR');
+    // ...and is removed once World.create() resolves.
+    await expect(page.getByTestId('app-loading-banner')).toHaveCount(0);
+
     await expect(page).toHaveTitle(/Talking Drum VR/i);
+
+    // The placeholder drum voice renders at startup without creating an AudioContext
+    // (no user gesture yet), and is not silent.
+    await expect
+      .poll(async () => page.evaluate(() => window.__talkingDrumAudio?.bufferReady ?? false))
+      .toBe(true);
+    const audioAtLoad = await page.evaluate(() => window.__talkingDrumAudio);
+    expect(audioAtLoad?.contextState).toBe('no-context');
+    expect(audioAtLoad?.bufferDurationSec).toBeCloseTo(0.65, 2);
+    expect(audioAtLoad?.bufferPeak).toBeGreaterThan(0.05);
 
     const enterVrButton = page.getByRole('button', { name: /enter vr/i });
     await expect(enterVrButton).toBeVisible();
@@ -143,6 +163,10 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     await expect(debugHud).toBeVisible();
     await expect(debugHud).toContainText('hand(right): UNTRACKED');
     await expect(debugHud).toContainText('strikes: 0');
+    const audioProbe = page.getByTestId('debug-hud-audio');
+    await expect(audioProbe).toContainText('software + audio buffer estimate');
+    await expect(audioProbe).toContainText('not tracking / end-to-end latency');
+    await expect(audioProbe).toContainText('pipeline n/a');
 
     const thirdPartyRequests = collectThirdPartyRequests(trackedRequests, response, page.url());
 
@@ -306,8 +330,14 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
       const runtime = window.__talkingDrumRuntime!;
       const hudEl = document.getElementById('xr-debug-hud')!;
 
+      const frameTimesMs: number[] = [];
       const nextFrame = () =>
-        new Promise<number>((resolve) => window.requestAnimationFrame(resolve));
+        new Promise<number>((resolve) =>
+          window.requestAnimationFrame((t) => {
+            frameTimesMs.push(t);
+            resolve(t);
+          }),
+        );
 
       // Calibrate the exact offset between xrDevice.hands.right.position (IWER globalSpace)
       // and HandTracker's palm midpoint in world.xrReferenceSpace by sampling at (0, 0, 0).
@@ -355,11 +385,44 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
       await stepFramesWithPose(6, 0, 0.06, 0);
       const countBeforeFastStrike = Number(hudEl.dataset.strikeCount ?? '0');
 
-      // (a) Fast downward strike through the head centre (+0.06 m -> +0.025 m -> -0.020 m)
-      await stepFramesWithPose(1, 0, 0.025, 0);
-      await stepFramesWithPose(3, 0, -0.02, 0);
+      // (a) Fast downward strike through the head centre (+0.06 m -> +0.025 m -> -0.020 m).
+      // The detector's gates are real-time (>= 0.30 m/s, >= 2 cm wind-up within 150 ms), but
+      // headless SwiftShader paces frames at ~100 ms with occasional 180-200 ms spikes. A 0.045 m
+      // step across a >150 ms frame really is a slow motion, so the detector correctly ignores
+      // it. Only such slow-frame attempts are retried (after re-arming); a miss on a normal frame
+      // fails the test.
+      const slowFrameMs = 140;
+      const maxStrikeAttempts = 4;
+      const strikeAttempts: Array<{ intervalsMs: number[]; hit: boolean }> = [];
+      let strikeFrameIntervalsMs: number[] = [];
+      for (let attempt = 0; attempt < maxStrikeAttempts; attempt += 1) {
+        if (attempt > 0) {
+          const rearmAt = performance.now();
+          while (performance.now() - rearmAt < 160) {
+            setPalmDrumLocal(0, 0.06, 0);
+            await nextFrame();
+          }
+        }
+        const before = Number(hudEl.dataset.strikeCount ?? '0');
+        const strikeFrameIndex = frameTimesMs.length;
+        await stepFramesWithPose(1, 0, 0.025, 0);
+        await stepFramesWithPose(3, 0, -0.02, 0);
+        strikeFrameIntervalsMs = frameTimesMs
+          .slice(strikeFrameIndex, strikeFrameIndex + 4)
+          .map((t, i, arr) => (i === 0 ? 0 : Math.round(t - arr[i - 1])))
+          .slice(1);
+        const hit = Number(hudEl.dataset.strikeCount ?? '0') > before;
+        strikeAttempts.push({ intervalsMs: strikeFrameIntervalsMs, hit });
+        const crossingWasSlow = strikeFrameIntervalsMs.slice(0, 2).some((dt) => dt > slowFrameMs);
+        if (hit || !crossingWasSlow) {
+          break;
+        }
+      }
       const countAfterFastStrike = Number(hudEl.dataset.strikeCount ?? '0');
       const hudTextAfterFastStrike = hudEl.textContent ?? '';
+      const audioAfterFastStrike = { ...window.__talkingDrumAudio! };
+      const audioProbeTextAfterFastStrike =
+        document.querySelector('[data-testid="debug-hud-audio"]')?.textContent ?? '';
 
       // Wait > 120 ms (exceeding debounceMs = 90 ms) and re-arm at +0.04 m above skin plane
       const rearmStart = performance.now();
@@ -406,6 +469,11 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
       const countAfterPlaneJitter = Number(hudEl.dataset.strikeCount ?? '0');
 
       return {
+        strikeAttempts,
+        strikeFrameIntervalsMs,
+        audioAfterFastStrike,
+        audioProbeTextAfterFastStrike,
+        voicesAtEnd: window.__talkingDrumAudio?.voicesStartedCount ?? -1,
         countBeforeFastStrike,
         countAfterFastStrike,
         countAfterSlowDescent,
@@ -417,8 +485,12 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
       };
     });
 
+    console.log(`[e2e] fast-strike attempts: ${JSON.stringify(strikeResults.strikeAttempts)}`);
     expect(strikeResults.countBeforeFastStrike).toBe(0);
-    expect(strikeResults.countAfterFastStrike).toBe(1);
+    expect(
+      strikeResults.countAfterFastStrike,
+      `fast-strike attempts (frame intervals ms / hit): ${JSON.stringify(strikeResults.strikeAttempts)}`,
+    ).toBe(1);
     expect(strikeResults.hudTextAfterFastStrike).toContain('hand(right): TRACKED');
     expect(strikeResults.hudTextAfterFastStrike).toContain('strikes: 1');
     expect(strikeResults.lastSpeedMps).toBeGreaterThanOrEqual(0.3);
@@ -428,6 +500,23 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     expect(strikeResults.countAfterSlowDescent).toBe(1);
     expect(strikeResults.countAfterRimMiss).toBe(1);
     expect(strikeResults.countAfterPlaneJitter).toBe(1);
+
+    // The hit reached DrumAudio.play(): the Enter VR click unlocked the AudioContext, so it was
+    // already 'running' at the first strike, and exactly one voice started (none for the misses).
+    expect(strikeResults.audioAfterFastStrike.contextStateAtFirstStrike).toBe('running');
+    expect(strikeResults.audioAfterFastStrike.contextState).toBe('running');
+    expect(strikeResults.audioAfterFastStrike.voicesStartedCount).toBe(1);
+    expect(strikeResults.audioAfterFastStrike.lastOutcome).toBe('played');
+    expect(strikeResults.audioAfterFastStrike.lastPlaybackRate).toBe(1);
+    expect(strikeResults.audioAfterFastStrike.lastGain).toBeGreaterThanOrEqual(0.15);
+    expect(strikeResults.audioAfterFastStrike.lastGain).toBeLessThanOrEqual(1);
+    expect(Number.isFinite(strikeResults.audioAfterFastStrike.lastSoftwarePipelineMs)).toBe(true);
+    expect(strikeResults.audioAfterFastStrike.lastSoftwarePipelineMs).toBeGreaterThanOrEqual(0);
+    expect(strikeResults.audioProbeTextAfterFastStrike).toMatch(/pipeline \d+\.\d{2} ms/);
+    expect(strikeResults.audioProbeTextAfterFastStrike).toContain('voices 1');
+    expect(strikeResults.voicesAtEnd).toBe(1);
+    // Hands are tracked, so the controller-only notice never appears.
+    await expect(page.getByTestId('vr-status-message')).toBeHidden();
 
     const allRequestUrls = trackedRequests
       .map((req) => req.url())
@@ -513,7 +602,11 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     await enterVrButton.click();
 
     await expect(enterVrButton).toHaveText('Exit VR');
-    await page.waitForTimeout(1000);
+
+    // No hand input appears, so after the grace period the controller-only notice is shown.
+    const statusMessage = page.getByTestId('vr-status-message');
+    await expect(statusMessage).toBeVisible({ timeout: 8000 });
+    await expect(statusMessage).toHaveText(EXPECTED_CONTROLLERS_ONLY_MESSAGE);
 
     const thirdPartyRequests = collectThirdPartyRequests(trackedRequests, response, page.url());
 
