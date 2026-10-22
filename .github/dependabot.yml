@@ -5,9 +5,41 @@ updates:
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 5
+    # Every ignore rule names a dependency AND lists version-update:* types. Rules scoped by
+    # update-types apply to version updates only, so Dependabot security updates still open
+    # PRs for these packages. Never add a bare `dependency-name` or `versions` rule here:
+    # those also suppress security updates.
+    ignore:
+      - dependency-name: 'vite'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'vitest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@iwsdk/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # three is an npm alias (npm:super-three@0.181.0); both names are listed because it is
+      # unverified which one Dependabot matches. three is 0.x, so each release (0.181 -> 0.182)
+      # is a semver-minor bump and is held back too; @types/three must track the same release.
+      - dependency-name: 'three'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'super-three'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@types/three'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types: ['minor', 'patch']
