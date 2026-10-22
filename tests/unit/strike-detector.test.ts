@@ -10,7 +10,9 @@ import {
   SKIN_PLANE_Y_METERS,
   buildCleanDownwardStrikePath,
   buildDoubleBouncePath,
+  buildJitterAtPlanePath,
   buildOffRimMissPath,
+  buildQuickTapFromAbovePath,
   buildSlowHoverPath,
   buildUpwardReturnStrokePath,
 } from '../fixtures/hand-paths.js';
@@ -64,6 +66,17 @@ describe('detectStrike (pure swept segment vs skin plane)', () => {
     expect(hits).toEqual([]);
   });
 
+  it('6. emits ZERO hits on jitterAtPlanePath (+/- 2.5 mm alternating at 72 Hz around skin plane)', () => {
+    const { hits } = runTrajectory(buildJitterAtPlanePath());
+    expect(hits).toEqual([]);
+  });
+
+  it('7. emits exactly 1 DrumHit on quickTapFromAbovePath (3 cm wind-up within 150 ms approach window)', () => {
+    const { hits } = runTrajectory(buildQuickTapFromAbovePath());
+    expect(hits).toHaveLength(1);
+    expect(hits[0].speed).toBeGreaterThanOrEqual(APP_CONFIG.strike.minDownwardSpeedMetersPerSec);
+  });
+
   it('rejects secondary-hand (left hand) strikes when allowSecondaryHand is false', () => {
     const leftHandStrike = buildCleanDownwardStrikePath().map((sample) => ({
       ...sample,
@@ -114,7 +127,7 @@ describe('detectStrike (pure swept segment vs skin plane)', () => {
     const validAbove: HandStrikeSample = {
       timeMs: 7000,
       hand: 'right',
-      localPosition: { x: 0, y: 0.21, z: 0 },
+      localPosition: { x: 0, y: 0.215, z: 0 },
     };
     const nanPose: HandStrikeSample = {
       timeMs: 7014,

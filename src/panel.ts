@@ -2,7 +2,6 @@ import { createSystem, type UIKit, UIKitMLAsset, Vector3, VisibilityState } from
 import { APP_CONFIG } from './app/config.js';
 import { getAppFlags } from './app/flags.js';
 import { TalkingDrum } from './app/talking-drum-component.js';
-import { DebugHud } from './debug/debug-hud.js';
 import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
 
@@ -10,7 +9,6 @@ export class PanelSystem extends createSystem({
   drums: { required: [TalkingDrum] },
 }) {
   private fpsOverlay: FpsOverlay | null = null;
-  private debugHud: DebugHud | null = null;
   private headWorldPos = new Vector3();
   private calibratedInSession = false;
 
@@ -20,11 +18,6 @@ export class PanelSystem extends createSystem({
       this.fpsOverlay = new FpsOverlay();
       this.fpsOverlay.mount();
       this.cleanupFuncs.push(() => this.fpsOverlay?.dispose());
-    }
-    if (flags.debug) {
-      this.debugHud = new DebugHud();
-      this.debugHud.mount();
-      this.cleanupFuncs.push(() => this.debugHud?.dispose());
     }
 
     const domEnterBtn = document.getElementById('enter-vr-button') as HTMLButtonElement | null;

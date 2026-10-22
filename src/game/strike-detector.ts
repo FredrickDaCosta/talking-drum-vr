@@ -6,6 +6,8 @@ import {
 } from '../app/config.js';
 import type { Vec3Like } from '../input/one-euro-filter.js';
 
+const APPROACH_RING_CAPACITY = 32;
+
 /**
  * Public strike payload emitted when a hand crosses the top drumhead skin plane.
  */
@@ -43,13 +45,23 @@ export interface HandStrikeSample {
 }
 
 /**
- * Per-hand mutable state for debounce and re-arm gating.
+ * Per-hand mutable state for debounce, re-arm, and allocation-free approach-window tracking.
  */
 export interface StrikeDetectorHandState {
   /** Timestamp (ms) of the last emitted DrumHit for this hand, or -Infinity if none. */
   lastHitTimeMs: number;
   /** Whether the hand is currently armed to trigger a hit (must rise above rearmDistanceMeters after a hit). */
   armed: boolean;
+  /** Fixed-capacity ring buffer of sample timestamps (ms) for approach-travel verification. */
+  readonly historyTimesMs: Float64Array;
+  /** Fixed-capacity ring buffer of signed heights above the skin plane (meters). */
+  readonly historyHeightsMeters: Float64Array;
+  /** Next write slot in the ring buffer [0, APPROACH_RING_CAPACITY). */
+  historyWriteIndex: number;
+  /** Number of valid entries currently in the ring buffer [0, APPROACH_RING_CAPACITY]. */
+  historyCount: number;
+  /** Timestamp of the most recently recorded sample in the ring buffer. */
+  lastRecordedTimeMs: number;
 }
 
 export interface StrikeDetectorConfigSlice {
@@ -61,7 +73,63 @@ export function createInitialStrikeHandState(): StrikeDetectorHandState {
   return {
     lastHitTimeMs: -Infinity,
     armed: true,
+    historyTimesMs: new Float64Array(APPROACH_RING_CAPACITY),
+    historyHeightsMeters: new Float64Array(APPROACH_RING_CAPACITY),
+    historyWriteIndex: 0,
+    historyCount: 0,
+    lastRecordedTimeMs: -Infinity,
   };
+}
+
+export function resetStrikeHandHistory(handState: StrikeDetectorHandState): void {
+  handState.historyWriteIndex = 0;
+  handState.historyCount = 0;
+  handState.lastRecordedTimeMs = -Infinity;
+}
+
+function recordApproachSample(
+  handState: StrikeDetectorHandState,
+  timeMs: number,
+  signedHeightMeters: number,
+): void {
+  if (timeMs < handState.lastRecordedTimeMs) {
+    resetStrikeHandHistory(handState);
+  }
+  if (timeMs === handState.lastRecordedTimeMs && handState.historyCount > 0) {
+    const prevIdx =
+      (handState.historyWriteIndex - 1 + APPROACH_RING_CAPACITY) % APPROACH_RING_CAPACITY;
+    handState.historyHeightsMeters[prevIdx] = signedHeightMeters;
+    return;
+  }
+  const idx = handState.historyWriteIndex;
+  handState.historyTimesMs[idx] = timeMs;
+  handState.historyHeightsMeters[idx] = signedHeightMeters;
+  handState.historyWriteIndex = (idx + 1) % APPROACH_RING_CAPACITY;
+  if (handState.historyCount < APPROACH_RING_CAPACITY) {
+    handState.historyCount += 1;
+  }
+  handState.lastRecordedTimeMs = timeMs;
+}
+
+function maxHeightInApproachWindow(
+  handState: StrikeDetectorHandState,
+  currTimeMs: number,
+  windowMs: number,
+  fallbackHeightMeters: number,
+): number {
+  const minTimeMs = currTimeMs - windowMs;
+  let maxHeight = fallbackHeightMeters;
+  const count = handState.historyCount;
+  for (let i = 0; i < count; i += 1) {
+    const t = handState.historyTimesMs[i];
+    if (t >= minTimeMs && t <= currTimeMs) {
+      const h = handState.historyHeightsMeters[i];
+      if (h > maxHeight) {
+        maxHeight = h;
+      }
+    }
+  }
+  return maxHeight;
 }
 
 function isFiniteSample(sample: HandStrikeSample): boolean {
@@ -78,6 +146,7 @@ function isFiniteSample(sample: HandStrikeSample): boolean {
  *
  * Checks whether the line segment from `prevSample.localPosition` to `currSample.localPosition`
  * crosses the top drumhead skin plane `y = +lengthMeters / 2` downward (`d_prev > 0` to `d_curr <= 0`),
+ * was preceded by a height >= `minApproachTravelMeters` within `approachWindowMs`,
  * intersects within `headRadiusMeters + hitRadiusMarginMeters`, meets `minDownwardSpeedMetersPerSec`,
  * and satisfies per-hand `debounceMs` and `rearmDistanceMeters` gates.
  */
@@ -105,6 +174,9 @@ export function detectStrike(
   const dPrev = prevSample.localPosition.y - skinY;
   const dCurr = currSample.localPosition.y - skinY;
 
+  recordApproachSample(handState, prevSample.timeMs, dPrev);
+  recordApproachSample(handState, currSample.timeMs, dCurr);
+
   // Re-arm once the hand has risen to or above rearmDistanceMeters above the skin plane
   if (!handState.armed && dPrev >= config.strike.rearmDistanceMeters) {
     handState.armed = true;
@@ -120,6 +192,18 @@ export function detectStrike(
 
   const totalVerticalTravel = dPrev - dCurr;
   if (totalVerticalTravel <= 0) {
+    return null;
+  }
+
+  // Approach-travel gate: reject micro-jitter crossings unless the hand was at least
+  // minApproachTravelMeters above the skin plane within the last approachWindowMs.
+  const maxApproachHeight = maxHeightInApproachWindow(
+    handState,
+    currSample.timeMs,
+    config.strike.approachWindowMs,
+    dPrev,
+  );
+  if (maxApproachHeight < config.strike.minApproachTravelMeters) {
     return null;
   }
 
@@ -154,6 +238,7 @@ export function detectStrike(
 
   handState.lastHitTimeMs = currSample.timeMs;
   handState.armed = false;
+  resetStrikeHandHistory(handState);
 
   return {
     time: currSample.timeMs,

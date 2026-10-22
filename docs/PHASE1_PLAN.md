@@ -1,6 +1,17 @@
 # Phase 1 Implementation Plan (`docs/PHASE1_PLAN.md`) — Hands-Only Strike Detection & Drum Sound (M1)
 
-> **Status:** Revised Plan for Review (PR #10 on `docs/phase1-plan` — no code or dependency changes in this PR).
+> **Status:** Approved & Active — Executing M1 in 3 Staged PRs (**M1a** merged in PR #12 `f1245d5`; **M1b** active; **M1c** next).
+
+---
+
+## 0. Staged Execution Split (M1a / M1b / M1c)
+
+- **Stage M1a (Completed & Merged — PR #12, `f1245d5`):**
+  - Task 0 network spike + vendored `@webxr-input-profiles/assets@1.0.20` hand meshes (`public/xr-profiles/generic-hand/{left,right}.glb`, `LICENSE`) + `src/platform/xr-profiles.ts` local hand visuals & controller visual fetch disablement + pure `OneEuroFilter3D` (`src/input/one-euro-filter.ts`) + pure `StrikeDetector` (`src/game/strike-detector.ts`) + unit & IWER XR session e2e tests.
+- **Stage M1b (Active — `feat/m1b-drum-hands-wiring`, No Audio Yet):**
+  - `StrikeDetector` approach-travel hardening (`minApproachTravelMeters: 0.02`, `approachWindowMs: 150`) + vertical drum asset with `30°` scene tilt (`rotationDeg: [30, 0, 0]`), single source of truth for drum geometry, and uncropped desktop framing + `HandTracker` adapter (`src/input/hand-tracker.ts`) + `StrikeSystem` (`src/game/strike-system.ts`) + `?hand=left|right` flag + `DebugHud` (`?debug=1`) hand/strike telemetry + scripted right-hand IWER e2e strike tests.
+- **Stage M1c (Next — After M1b Closes):**
+  - `DrumAudio` (`src/audio/drum-audio.ts`, `OfflineAudioContext` _gángan_ placeholder, `play({ velocity, pitchRatio })`) + `DebugHud` latency probe + startup loading banner (`#app-loading-banner`) + controller-only XR guidance message + M1 close.
 
 ---
 
@@ -65,7 +76,11 @@ flowchart LR
     2. Computes crossing fraction $u = \frac{d_{t-1}}{d_{t-1} - d_t} \in [0, 1]$ and plane intersection point $\mathbf{p}_{\text{hit}} = \mathbf{p}_{t-1} + u(\mathbf{p}_t - \mathbf{p}_{t-1})$.
     3. **Hit Radius Gate:** Requires radial distance $r = \sqrt{p_{\text{hit},x}^2 + p_{\text{hit},z}^2} \le \text{headRadiusMeters} + \text{hitRadiusMarginMeters}$ (`0.11 m + 0.01 m = 0.12 m`).
     4. **Minimum Downward Speed Gate (`minDownwardSpeedMetersPerSec`):** Computes downward normal speed $v_{\text{down}} = \frac{d_{t-1} - d_t}{\Delta t}$ and requires $v_{\text{down}} \ge \text{minDownwardSpeedMetersPerSec}$ (starting at **`0.30 m/s`**).
-    5. **Per-Hand Debounce & Re-Arm:** Requires `time - lastHitTimeMs >= debounceMs` (starting at **`90 ms`**) and requires the hand to rise back above `rearmDistanceMeters: 0.008` (`8 mm`) before re-triggering.
+    5. **Minimum Approach-Travel Gate (`minApproachTravelMeters` & `approachWindowMs` — M1b Hardening):**
+       - *Problem:* A hand hovering near the skin plane with $\pm 2.5\text{ mm}$ optical tracking noise at `72 Hz` (`dt = 13.89 ms`) experiences a `5 mm` vertical step in one frame, which looks like a `0.36 m/s` downward crossing ($\ge 0.30\text{ m/s}$).
+       - *Solution:* `detectStrike` records recent signed heights in an allocation-free 32-sample ring buffer and requires that the hand reached at least `strike.minApproachTravelMeters` (**`0.02 m` / `2 cm`**) above the skin plane at some sample within the preceding `strike.approachWindowMs` (**`150 ms`**) before a downward crossing counts as a hit.
+       - *Trade-Off:* Intentional micro-taps with less than `2 cm` of vertical wind-up above the drumhead will not register as strikes. Both `minApproachTravelMeters` (`0.02 m`) and `approachWindowMs` (`150 ms`) are centralized in `src/app/config.ts` so they can be tuned if physical Quest playtesting calls for a tighter or looser wind-up threshold.
+    6. **Per-Hand Debounce & Re-Arm:** Requires `time - lastHitTimeMs >= debounceMs` (starting at **`90 ms`**) and requires the hand to rise back above `rearmDistanceMeters: 0.008` (`8 mm`) before re-triggering.
 - **Payloads (`DrumHit` vs. `InternalStrikeEvent`):**
   - **Public `DrumHit` payload** (kept strictly as specified):
     ```ts

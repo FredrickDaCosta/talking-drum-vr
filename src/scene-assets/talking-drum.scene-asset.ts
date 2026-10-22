@@ -37,11 +37,10 @@ function createTalkingDrumPrototype(): Group {
     metalness: 0.0,
   });
 
-  // Orient the drum horizontally along the X/Z playing posture (slight 20 deg angle for natural strike access)
+  // Long axis is +Y in drum-local space (top struck drumhead at y = +halfLength, normal +Y).
+  // World-space tilt toward the seated player (drumTiltDeg: 30) is authored on the scene node.
   const assembly = new Group();
   assembly.name = 'DrumAssembly';
-  assembly.rotation.z = Math.PI / 2;
-  assembly.rotation.y = -0.25;
 
   // Left and right flared wooden cones meeting at the center waist
   const coneGeoLeft = new CylinderGeometry(
@@ -118,6 +117,13 @@ function createTalkingDrumPrototype(): Group {
   }
   assembly.add(cordsGroup);
 
+  root.userData.drumGeometry = {
+    lengthMeters,
+    halfLengthMeters: halfLength,
+    headRadiusMeters,
+    waistRadiusMeters,
+    tensionCordCount,
+  };
   root.add(assembly);
   return root;
 }
