@@ -3,7 +3,7 @@ import { APP_CONFIG } from '../../src/app/config.js';
 import { parseAppFlags } from '../../src/app/flags.js';
 
 describe('parseAppFlags', () => {
-  it('defaults both flags to false on empty query string', () => {
+  it('defaults flags on empty query string', () => {
     expect(parseAppFlags('')).toEqual({ xrfps: false, debug: false });
     expect(parseAppFlags('?')).toEqual({ xrfps: false, debug: false });
   });
@@ -31,12 +31,23 @@ describe('parseAppFlags', () => {
       debug: false,
     });
   });
+
+  it('parses ?hand=left and ?hand=right case-insensitively and ignores invalid values', () => {
+    expect(parseAppFlags('?hand=left')).toEqual({ xrfps: false, debug: false, hand: 'left' });
+    expect(parseAppFlags('?hand=RIGHT&debug=1')).toEqual({
+      xrfps: false,
+      debug: true,
+      hand: 'right',
+    });
+    expect(parseAppFlags('?hand=invalid')).toEqual({ xrfps: false, debug: false });
+  });
 });
 
 describe('APP_CONFIG', () => {
-  it('defines seated drum placement 0.5m ahead and 0.35m below eye level', () => {
+  it('defines seated drum placement 0.5m ahead, 0.35m below eye level, and 30 deg tilt', () => {
     expect(APP_CONFIG.drumPlacement.distanceAheadMeters).toBe(0.5);
     expect(APP_CONFIG.drumPlacement.belowEyeLevelMeters).toBe(0.35);
+    expect(APP_CONFIG.drumPlacement.drumTiltDeg).toBe(30);
     expect(APP_CONFIG.defaultBasePath).toBe('/');
   });
 });

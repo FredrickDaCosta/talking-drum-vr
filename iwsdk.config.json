@@ -23,8 +23,8 @@
       "near": 0.01,
       "far": 100,
       "camera": {
-        "position": [0, 1.6, 0.35],
-        "lookAt": [0, 1.25, -0.5]
+        "position": [0, 1.6, 0.45],
+        "lookAt": [0, 1.35, -0.5]
       }
     },
     "features": {

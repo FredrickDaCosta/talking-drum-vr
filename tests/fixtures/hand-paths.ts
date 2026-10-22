@@ -122,3 +122,53 @@ export function buildUpwardReturnStrokePath(): HandStrikeSample[] {
   }
   return samples;
 }
+
+/**
+ * 6. Jitter at skin plane: +/- 2.5 mm (+/- 0.0025 m) alternating at 72 Hz around y = +0.19 m.
+ * Note: 5 mm peak-to-peak over 13.89 ms has instantaneous downward speed ~0.36 m/s (> 0.30 m/s),
+ * but max height above the skin plane is only 2.5 mm (< minApproachTravelMeters = 20 mm).
+ * Expected: 0 hits (null across all steps).
+ */
+export function buildJitterAtPlanePath(): HandStrikeSample[] {
+  const samples: HandStrikeSample[] = [];
+  for (let i = 0; i < 16; i++) {
+    const timeMs = 6000 + i * FRAME_INTERVAL_72HZ_MS;
+    const offset = i % 2 === 0 ? 0.0025 : -0.0025;
+    samples.push({
+      timeMs,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + offset, z: 0.0 },
+    });
+  }
+  return samples;
+}
+
+/**
+ * 7. Quick tap from above: 3 cm (0.03 m) wind-up above the skin plane descending cleanly
+ * within the 150 ms approach window.
+ * Expected: 1 DrumHit.
+ */
+export function buildQuickTapFromAbovePath(): HandStrikeSample[] {
+  return [
+    {
+      timeMs: 7000,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + 0.03, z: 0.0 },
+    },
+    {
+      timeMs: 7000 + FRAME_INTERVAL_72HZ_MS,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + 0.02, z: 0.0 },
+    },
+    {
+      timeMs: 7000 + 2 * FRAME_INTERVAL_72HZ_MS,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS + 0.008, z: 0.0 },
+    },
+    {
+      timeMs: 7000 + 3 * FRAME_INTERVAL_72HZ_MS,
+      hand: 'right',
+      localPosition: { x: 0.0, y: SKIN_PLANE_Y_METERS - 0.004, z: 0.0 },
+    },
+  ];
+}

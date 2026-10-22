@@ -31,6 +31,10 @@ export interface DrumGeometryConfig {
 export interface StrikeConfig {
   /** Minimum downward velocity normal to the drumhead skin plane required to trigger a hit (meters per second). */
   readonly minDownwardSpeedMetersPerSec: number;
+  /** Minimum height above the skin plane the hand must reach within approachWindowMs before a downward crossing counts (meters). */
+  readonly minApproachTravelMeters: number;
+  /** Lookback time window for verifying minApproachTravelMeters above the skin plane (milliseconds). */
+  readonly approachWindowMs: number;
   /** Minimum elapsed time between two hits from the same hand (milliseconds). */
   readonly debounceMs: number;
   /** Radial margin added to headRadiusMeters for forgiving palm/fingertip edge strikes (meters). */
@@ -105,6 +109,8 @@ export const APP_CONFIG: AppConfig = {
   },
   strike: {
     minDownwardSpeedMetersPerSec: 0.3,
+    minApproachTravelMeters: 0.02,
+    approachWindowMs: 150,
     debounceMs: 90,
     hitRadiusMarginMeters: 0.01,
     rearmDistanceMeters: 0.008,

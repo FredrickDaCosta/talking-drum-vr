@@ -53,7 +53,8 @@
         "asset": "talking-drum"
       },
       "transform": {
-        "position": [0, 1.25, -0.5]
+        "position": [0, 1.25, -0.5],
+        "rotationDeg": [30, 0, 0]
       },
       "components": {
         "TalkingDrum": {
@@ -70,8 +71,8 @@
         "asset": "welcome-panel"
       },
       "transform": {
-        "position": [0, 1.58, -1.25],
-        "scale": 0.35
+        "position": [0, 1.76, -1.35],
+        "scale": 0.32
       },
       "components": {
         "RayInteractable": {},
