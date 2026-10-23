@@ -395,6 +395,25 @@ export class DrumAudio {
   }
 
   /**
+   * Resolves true once the context is running (resolving at once if it already is), or false if
+   * there is no context or resume() fails. Desktop strikes use it so the first click, which also
+   * unlocks audio, is heard instead of being skipped while resume() is still pending.
+   */
+  whenRunning(): Promise<boolean> {
+    const ctx = this.ctx;
+    if (ctx === null) {
+      return Promise.resolve(false);
+    }
+    if (ctx.state === 'running') {
+      return Promise.resolve(true);
+    }
+    return ctx.resume().then(
+      () => (ctx.state as string) === 'running',
+      () => false,
+    );
+  }
+
+  /**
    * Stops demo voices from playAt() that are still scheduled or sounding (XR session end, tab
    * hidden). Strike voices are left alone. Returns how many were stopped.
    */

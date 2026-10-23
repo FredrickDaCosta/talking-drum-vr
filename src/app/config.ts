@@ -247,6 +247,16 @@ export interface DebugPanelConfig {
   readonly markKey: string;
 }
 
+export interface DesktopConfig {
+  /** Strike speed (m/s) for a click / tap / Space strike, and for a soft (Shift) one. */
+  readonly strikeVelocityMps: number;
+  readonly softStrikeVelocityMps: number;
+  /** Band selected when desktop mode starts. */
+  readonly initialBand: PitchBand;
+  /** Rim points used to project the drum head onto the screen for the click test. */
+  readonly headOutlinePoints: number;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -271,6 +281,7 @@ export interface AppConfig {
   readonly lesson: LessonConfig;
   readonly lessonPanel: LessonPanelConfig;
   readonly debugPanel: DebugPanelConfig;
+  readonly desktop: DesktopConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -422,6 +433,12 @@ export const APP_CONFIG: AppConfig = {
     markCapacity: 32,
     toggleKey: 'Backquote',
     markKey: 'KeyM',
+  },
+  desktop: {
+    strikeVelocityMps: 1.6,
+    softStrikeVelocityMps: 0.6,
+    initialBand: 'M',
+    headOutlinePoints: 24,
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,
