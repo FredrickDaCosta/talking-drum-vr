@@ -4,7 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Added
+## [m1] - 2026-10-23 (Hands-Only Strike Detection & Drum Sound)
+
+### Release Metadata
+
+- **Date:** `2026-10-23`
+- **Tag:** `m1` (annotated, on `main` after PR #21 `3ae807c` and this release-notes commit; not a `v*` tag, so it does not trigger a deploy)
+- **Live URL:** `https://drum.da-costa.online/`
+- **Toolchain & Core Versions:** Node.js 24 in CI (`"engines": { "node": ">=20.19" }`); IWSDK `1.0.1`; Three.js `super-three@0.181.0`; Vite `7.3.7`; Vitest `4.1.12`; Playwright `1.64.1`; sharp override `0.35.5`
+- **Bundle Metrics (M1c deploy):** Initial-load JS `834,364 B` (`0.834 MB` gzipped, `2.835 MB` raw; limit `1.50 MB`) | Total `dist/` `3,790,009 B` (`3.790 MB`, 21 files; limit `25.00 MB`)
+- **Quality Gates:**
+  - Unit tests 63/63 and e2e 5/5; `npm audit`: 0 vulnerabilities
+  - E2E flake closure: IWER hand-strike test passed 30/30 consecutively with retries off (local, `--repeat-each=30`, 5 m 2 s). CI keeps `retries: 1`.
+- **Deployment & Live Smoke Evidence (M1c, `3ae807c`):**
+  - CI: `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39961741216` (`success`)
+  - CodeQL: `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39961741352` (`success`)
+  - Deploy run: `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39961741328`
+    - Deploy job (`Build & Deploy Pages`): `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39961741328/job/120441167781` (`success`)
+    - Live smoke job (`Live Smoke Test`, 5/5 passed): `https://github.com/FredrickDaCosta/talking-drum-vr/actions/runs/39961741328/job/120441643886` (`success`)
+- **Verification Scope:** M1b was emulator-verified by Fredrick (2026-10-22). M1c audio has been checked only in the emulator e2e suite, which counts voices rather than listening. **UNVERIFIED** until tested on a Quest: hand-tracking feel, strike thresholds, audible quality and latency, 72/90 FPS thermals, and reach.
+
+### Added in M1
 
 - **Stage M1c — Drum Audio, Latency Probe, Loading & Fallback UX:**
   - `DrumAudio` (`src/audio/drum-audio.ts`): lazy single `AudioContext` unlocked by the Enter VR click or the first page gesture; procedural _gángan_ placeholder rendered via `OfflineAudioContext` (`src/audio/gangan-placeholder.ts`); `play({ velocity, pitchRatio = 1 })` with g = 0.15 + 0.85·v^0.75 over 0.30–3.0 m/s; HRTF panner at the drum head; pooled voice gains. Wired by `DrumAudioSystem` through `StrikeSystem.onStrike`.
@@ -12,7 +32,7 @@ All notable changes to this project will be documented in this file.
   - Static `#app-loading-banner`, removed on startup and switched to an error message on failure.
   - Controller-only / no-hands XR notice after a 3 s grace period.
   - Player-rig transform safeguard for hand poses (`src/input/reference-space.ts`).
-- **Security (2026-10-22):** sharp override 0.35.5 (#14), vitest ^4.1.12 (#15), Dependabot ignore-majors for version updates plus minor/patch groups (#16). `npm audit`: 0 vulnerabilities.
+- **Security (2026-10-22):** sharp override 0.35.5 (#14), vitest ^4.1.12 (#15), Dependabot ignore-majors for version updates plus minor/patch groups (#16), eslint/@eslint/js/typescript major ignores (#22). `npm audit`: 0 vulnerabilities.
 - **Stage M1b — Tilted Drum Orientation, `HandTracker`, `StrikeSystem` & `DebugHud` Telemetry:**
   - Hardened `detectStrike` (`src/game/strike-detector.ts`) with an allocation-free 32-sample approach-window ring buffer (`minApproachTravelMeters: 0.02`, `approachWindowMs: 150`) so $\pm 2.5\text{ mm}$ hover jitter at `72 Hz` produces zero false hits while quick taps from $\ge 2\text{ cm}$ above the skin plane register cleanly.
   - Oriented `talkingDrumAsset` (`src/scene-assets/talking-drum.scene-asset.ts`) vertically along $+Y$ with zero baked rotation, sharing `lengthMeters` (`0.38 m`, half-length `0.19 m`) and `headRadiusMeters` (`0.11 m`) from `APP_CONFIG.drumGeometry`, and tilted the drum `30°` toward the seated player via `"rotationDeg": [30, 0, 0]` in `public/scenes/main.iwsdk.scene.json` (placing the top drumhead centre at `[0, 1.4145, -0.4050]`, `0.4050 m` horizontally / `0.4454 m` 3D Euclidean from default eye level `[0, 1.6, 0]`, within the `0.61 m` reach limit).
@@ -22,7 +42,7 @@ All notable changes to this project will be documented in this file.
   - Vendored `@webxr-input-profiles/assets@1.0.20` generic-hand meshes (`public/xr-profiles/generic-hand/left.glb`, `right.glb`, `LICENSE`) and wired local hand visual adapters (`src/platform/xr-profiles.ts`) with zero third-party network requests.
   - Added allocation-free `OneEuroFilter3D` (`src/input/one-euro-filter.ts`), pure `detectStrike` (`src/game/strike-detector.ts`), synthetic 72 Hz hand-path fixtures (`tests/fixtures/hand-paths.ts`), and unit/e2e test suites.
 
-### Changed
+### Changed in M1
 
 - **Custom Domain & Root Base Path (`drum.da-costa.online`):** Switched default `BASE_PATH` from `/talking-drum-vr/` to `/` and default `LIVE_URL` to `https://drum.da-costa.online/` across Vite, Playwright, GitHub Actions CI/Deploy workflows, and documentation following GitHub Pages custom domain verification and HTTPS enforcement (`301` redirect from `https://fredrickdacosta.github.io/talking-drum-vr/` to `https://drum.da-costa.online/`).
 
