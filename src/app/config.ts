@@ -73,6 +73,34 @@ export interface OneEuroFilterConfig {
   readonly maxGapMs: number;
 }
 
+export interface DrumAudioConfig {
+  /** Strike speed mapped to the quietest voice; slower hits are clamped up to it (meters per second). */
+  readonly minStrikeSpeedMps: number;
+  /** Strike speed mapped to full gain; faster hits are clamped down to it (meters per second). */
+  readonly maxStrikeSpeedMps: number;
+  /** Gain at the quietest normalised velocity (v = 0); g = minGain + (1 - minGain) * v^gainExponent. */
+  readonly minGain: number;
+  /** Perceptual exponent applied to the normalised velocity. */
+  readonly gainExponent: number;
+  /** Lower clamp for play({ pitchRatio }) -> AudioBufferSourceNode.playbackRate. */
+  readonly minPitchRatio: number;
+  /** Upper clamp for play({ pitchRatio }) -> AudioBufferSourceNode.playbackRate. */
+  readonly maxPitchRatio: number;
+  /** Pre-allocated per-voice GainNodes reused round-robin (no per-hit GainNode allocation). */
+  readonly voicePoolSize: number;
+  /** Sample rate of the OfflineAudioContext that renders the placeholder gángan buffer (Hz). */
+  readonly placeholderSampleRateHz: number;
+  /** HRTF PannerNode reference distance (meters). */
+  readonly pannerRefDistanceMeters: number;
+}
+
+export interface XrInputNoticeConfig {
+  /** Time after an XR session becomes visible before checking for tracked hands (milliseconds). */
+  readonly handDetectionGraceMs: number;
+  /** Interval between input-source checks once the grace period has elapsed (milliseconds). */
+  readonly recheckIntervalMs: number;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -89,6 +117,8 @@ export interface AppConfig {
   readonly strikeFilter: OneEuroFilterConfig;
   /** Heavier smoothing filter feeding visual hover indicators and HUD distance readouts only. */
   readonly visualFilter: OneEuroFilterConfig;
+  readonly audio: DrumAudioConfig;
+  readonly xrInputNotice: XrInputNoticeConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -137,6 +167,21 @@ export const APP_CONFIG: AppConfig = {
     beta: 1.5,
     dCutoffHz: 5.0,
     maxGapMs: 100,
+  },
+  audio: {
+    minStrikeSpeedMps: 0.3,
+    maxStrikeSpeedMps: 3.0,
+    minGain: 0.15,
+    gainExponent: 0.75,
+    minPitchRatio: 0.5,
+    maxPitchRatio: 2.0,
+    voicePoolSize: 8,
+    placeholderSampleRateHz: 48000,
+    pannerRefDistanceMeters: 0.5,
+  },
+  xrInputNotice: {
+    handDetectionGraceMs: 3000,
+    recheckIntervalMs: 250,
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

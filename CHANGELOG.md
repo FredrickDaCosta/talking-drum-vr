@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Stage M1c — Drum Audio, Latency Probe, Loading & Fallback UX:**
+  - `DrumAudio` (`src/audio/drum-audio.ts`): lazy single `AudioContext` unlocked by the Enter VR click or the first page gesture; procedural _gángan_ placeholder rendered via `OfflineAudioContext` (`src/audio/gangan-placeholder.ts`); `play({ velocity, pitchRatio = 1 })` with g = 0.15 + 0.85·v^0.75 over 0.30–3.0 m/s; HRTF panner at the drum head; pooled voice gains. Wired by `DrumAudioSystem` through `StrikeSystem.onStrike`.
+  - `?debug=1` HUD line "software + audio buffer estimate (not tracking / end-to-end latency)".
+  - Static `#app-loading-banner`, removed on startup and switched to an error message on failure.
+  - Controller-only / no-hands XR notice after a 3 s grace period.
+  - Player-rig transform safeguard for hand poses (`src/input/reference-space.ts`).
+- **Security (2026-10-22):** sharp override 0.35.5 (#14), vitest ^4.1.12 (#15), Dependabot ignore-majors for version updates plus minor/patch groups (#16). `npm audit`: 0 vulnerabilities.
 - **Stage M1b — Tilted Drum Orientation, `HandTracker`, `StrikeSystem` & `DebugHud` Telemetry:**
   - Hardened `detectStrike` (`src/game/strike-detector.ts`) with an allocation-free 32-sample approach-window ring buffer (`minApproachTravelMeters: 0.02`, `approachWindowMs: 150`) so $\pm 2.5\text{ mm}$ hover jitter at `72 Hz` produces zero false hits while quick taps from $\ge 2\text{ cm}$ above the skin plane register cleanly.
   - Oriented `talkingDrumAsset` (`src/scene-assets/talking-drum.scene-asset.ts`) vertically along $+Y$ with zero baked rotation, sharing `lengthMeters` (`0.38 m`, half-length `0.19 m`) and `headRadiusMeters` (`0.11 m`) from `APP_CONFIG.drumGeometry`, and tilted the drum `30°` toward the seated player via `"rotationDeg": [30, 0, 0]` in `public/scenes/main.iwsdk.scene.json` (placing the top drumhead centre at `[0, 1.4145, -0.4050]`, `0.4050 m` horizontally / `0.4454 m` 3D Euclidean from default eye level `[0, 1.6, 0]`, within the `0.61 m` reach limit).

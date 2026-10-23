@@ -1,6 +1,6 @@
 # Phase 1 Implementation Plan (`docs/PHASE1_PLAN.md`) — Hands-Only Strike Detection & Drum Sound (M1)
 
-> **Status:** Approved & Active — Executing M1 in 3 Staged PRs (**M1a** merged in PR #12 `f1245d5`; **M1b** active; **M1c** next).
+> **Status:** Approved & Active — Executing M1 in 3 Staged PRs (**M1a** merged in PR #12 `f1245d5`; **M1b** merged in PR #13 `acf8a8f` and emulator-verified by Fredrick; **M1c** in review on `feat/m1c-drum-audio`).
 
 ---
 
@@ -8,9 +8,9 @@
 
 - **Stage M1a (Completed & Merged — PR #12, `f1245d5`):**
   - Task 0 network spike + vendored `@webxr-input-profiles/assets@1.0.20` hand meshes (`public/xr-profiles/generic-hand/{left,right}.glb`, `LICENSE`) + `src/platform/xr-profiles.ts` local hand visuals & controller visual fetch disablement + pure `OneEuroFilter3D` (`src/input/one-euro-filter.ts`) + pure `StrikeDetector` (`src/game/strike-detector.ts`) + unit & IWER XR session e2e tests.
-- **Stage M1b (Active — `feat/m1b-drum-hands-wiring`, No Audio Yet):**
+- **Stage M1b (Completed & Merged — PR #13, `acf8a8f`; emulator-verified 2026-10-22):**
   - `StrikeDetector` approach-travel hardening (`minApproachTravelMeters: 0.02`, `approachWindowMs: 150`) + vertical drum asset with `30°` scene tilt (`rotationDeg: [30, 0, 0]`), single source of truth for drum geometry, and uncropped desktop framing + `HandTracker` adapter (`src/input/hand-tracker.ts`) + `StrikeSystem` (`src/game/strike-system.ts`) + `?hand=left|right` flag + `DebugHud` (`?debug=1`) hand/strike telemetry + scripted right-hand IWER e2e strike tests.
-- **Stage M1c (Next — After M1b Closes):**
+- **Stage M1c (In Review — `feat/m1c-drum-audio`):**
   - `DrumAudio` (`src/audio/drum-audio.ts`, `OfflineAudioContext` _gángan_ placeholder, `play({ velocity, pitchRatio })`) + `DebugHud` latency probe + startup loading banner (`#app-loading-banner`) + controller-only XR guidance message + M1 close.
 
 ---
@@ -189,7 +189,9 @@ flowchart LR
 | Real optical hand-tracking confidence dropouts, palm vs. fingertip ergonomics   | **No** (CI uses synthetic hand paths)        | **Yes**                       |
 | Seated eye-level calibration & comfortable `0.50 m` strike reach                | **No**                                       | **Yes**                       |
 
-### 3.4 Switching Immersive Web Emulator (v2.0.0) to Hand Tracking — **UNVERIFIED**
+### 3.4 Switching Immersive Web Emulator (v2.0.0) to Hand Tracking — **VERIFIED (2026-10-22)**
+
+> Fredrick verified: the **input-mode icon** on the emulator's on-page toolbar switches from controllers to hands, and `hand(right)` then reads `TRACKED` (see `docs/TEST_PLAN.md §3.1`). The original note follows for history.
 
 > [!WARNING]
 > **UNVERIFIED UI STEPS:** In M0, Fredrick observed that the **Immersive Web Emulator Chrome extension (`v2.0.0`)** renders an **on-page toolbar** when active, not a Chrome DevTools tab, and no official documentation confirms the exact v2.0.0 control labels for switching from controllers to hand tracking.

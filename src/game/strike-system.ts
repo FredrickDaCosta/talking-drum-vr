@@ -5,6 +5,10 @@ import { TalkingDrum } from '../app/talking-drum-component.js';
 import { DebugHud, type DebugHudTelemetry } from '../debug/debug-hud.js';
 import { HandTracker, type HandTrackingQuality } from '../input/hand-tracker.js';
 import {
+  composeReferenceSpaceToDrumLocal,
+  isIdentityMatrixElements,
+} from '../input/reference-space.js';
+import {
   createInitialStrikeHandState,
   detectStrike,
   type HandStrikeSample,
@@ -31,6 +35,8 @@ export interface TalkingDrumRuntimeDiagnostics {
   lastStrikeSpeedMps: number;
   lastStrikeRadialMeters: number;
   lastFrameTimestampMs: number;
+  /** False when the player rig is not at identity (reference-space poses are re-based onto it). */
+  playerRigIsIdentity: boolean;
 }
 
 declare global {
@@ -112,6 +118,7 @@ export class StrikeSystem extends createSystem({
     right: createHandDetectorChannel('right'),
   };
   private readonly invDrumWorldMatrix = new Matrix4();
+  private readonly referenceToDrumLocalMatrix = new Matrix4();
   private readonly drumWorldPos = new Vector3();
   private readonly drumWorldQuat = new Quaternion();
   private readonly topHeadNormalWorld = new Vector3();
@@ -140,6 +147,7 @@ export class StrikeSystem extends createSystem({
     lastStrikeSpeedMps: 0,
     lastStrikeRadialMeters: 0,
     lastFrameTimestampMs: 0,
+    playerRigIsIdentity: true,
   };
 
   private debugHud: DebugHud | null = null;
@@ -150,6 +158,7 @@ export class StrikeSystem extends createSystem({
   private lastStrikeSpeedMps = 0;
   private lastStrikeRadialMeters = 0;
   private wasImmersive = false;
+  private frameEntryPerfNowMs = 0;
 
   init(): void {
     const flags = getAppFlags();
@@ -235,7 +244,7 @@ export class StrikeSystem extends createSystem({
       frame,
       referenceSpace,
       inputSource,
-      this.invDrumWorldMatrix.elements,
+      this.referenceToDrumLocalMatrix.elements,
       frameTimestampMs,
     );
 
@@ -310,6 +319,7 @@ export class StrikeSystem extends createSystem({
         hit,
         hand: handedness,
         frameTimestampMs,
+        frameEntryPerfNowMs: this.frameEntryPerfNowMs,
       };
       for (let i = 0; i < listeners.length; i += 1) {
         listeners[i](event);
@@ -320,6 +330,7 @@ export class StrikeSystem extends createSystem({
   }
 
   update(_delta: number, time: number): void {
+    this.frameEntryPerfNowMs = performance.now();
     const frameTimestampMs = time * 1000;
     let drumObj = null;
     for (const entity of this.queries.drums.entities) {
@@ -355,6 +366,15 @@ export class StrikeSystem extends createSystem({
     }
 
     this.wasImmersive = true;
+    this.player.updateWorldMatrix(true, false);
+    composeReferenceSpaceToDrumLocal(
+      this.referenceToDrumLocalMatrix,
+      this.invDrumWorldMatrix,
+      this.player.matrixWorld,
+    );
+    this.diagnostics.playerRigIsIdentity = isIdentityMatrixElements(
+      this.player.matrixWorld.elements,
+    );
     const frame = this.world.xrFrame;
     const referenceSpace = this.world.xrReferenceSpace;
     const session = this.world.xrSession;

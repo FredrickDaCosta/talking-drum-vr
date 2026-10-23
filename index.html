@@ -22,6 +22,27 @@
           Roboto,
           sans-serif;
       }
+      #app-loading-banner {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1001;
+        max-width: min(92vw, 540px);
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(20, 18, 16, 0.95);
+        color: #fff8eb;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.45;
+        text-align: center;
+      }
+      #app-loading-banner[data-state='error'] {
+        border-color: #ff7b72;
+        color: #ffdcd7;
+      }
       #scene-container {
         width: 100%;
         height: 100%;
@@ -74,6 +95,15 @@
     </style>
   </head>
   <body>
+    <div
+      id="app-loading-banner"
+      data-testid="app-loading-banner"
+      data-state="loading"
+      role="status"
+      aria-live="polite"
+    >
+      Loading Talking Drum VR…
+    </div>
     <div id="scene-container"></div>
     <div id="xr-hud-controls">
       <div

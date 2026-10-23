@@ -10,6 +10,29 @@ export interface DebugHudTelemetry {
   lastStrikeRadialMeters: number;
 }
 
+export interface DebugHudAudioProbe {
+  contextState: string;
+  voicesStartedCount: number;
+  lastSoftwarePipelineMs: number;
+  baseLatencyMs: number;
+  outputLatencyMs: number;
+}
+
+export const AUDIO_PROBE_LABEL = 'software + audio buffer estimate';
+
+function formatMs(ms: number, digits: number): string {
+  return Number.isFinite(ms) ? `${ms.toFixed(digits)} ms` : 'n/a';
+}
+
+/**
+ * Debug-only latency line. `pipeline` is performance.now() at play() minus performance.now() at
+ * StrikeSystem frame entry; `base`/`out` are AudioContext.baseLatency/outputLatency. None of these
+ * measure hand-tracking or end-to-end motion-to-sound latency (Quest-only, UNVERIFIED).
+ */
+export function formatAudioProbe(probe: DebugHudAudioProbe): string {
+  return `${AUDIO_PROBE_LABEL} (not tracking / end-to-end latency): pipeline ${formatMs(probe.lastSoftwarePipelineMs, 2)} | base ${formatMs(probe.baseLatencyMs, 1)} | out ${formatMs(probe.outputLatencyMs, 1)} | audio ${probe.contextState} | voices ${probe.voicesStartedCount}`;
+}
+
 function formatSignedMeters(meters: number): string {
   if (!Number.isFinite(meters)) {
     return 'n/a';
@@ -20,12 +43,19 @@ function formatSignedMeters(meters: number): string {
 
 /**
  * Debug HUD activated via `?debug=1`.
- * Displays active hand tracking state (TRACKED, EMULATED, UNTRACKED), signed distance
+ * Line 1: active hand tracking state (TRACKED, EMULATED, UNTRACKED), signed distance
  * to the top drumhead skin plane, strike count, last strike speed, and radial position.
+ * Line 2: the software + audio buffer latency estimate (see formatAudioProbe).
  * Throttles DOM writes while immediately flushing discrete state or strike count changes.
  */
 export class DebugHud {
+  /** The mounted HUD, so other systems (DrumAudioSystem) can add their debug line. */
+  static active: DebugHud | null = null;
+
   private element: HTMLDivElement | null = null;
+  private mainLine: HTMLDivElement | null = null;
+  private audioLine: HTMLDivElement | null = null;
+  private lastAudioText = '';
   private readonly throttleIntervalMs: number;
   private lastWriteTimestampMs = -Infinity;
   private lastRenderedStrikeCount = -1;
@@ -42,8 +72,7 @@ export class DebugHud {
     }
     const existing = document.getElementById('xr-debug-hud') as HTMLDivElement | null;
     if (existing !== null) {
-      this.element = existing;
-      return;
+      existing.remove();
     }
     const el = document.createElement('div');
     el.id = 'xr-debug-hud';
@@ -64,8 +93,16 @@ export class DebugHud {
       'pointer-events:none',
       'user-select:none',
     ].join(';');
+    const mainLine = document.createElement('div');
+    mainLine.dataset.testid = 'debug-hud-main';
+    const audioLine = document.createElement('div');
+    audioLine.dataset.testid = 'debug-hud-audio';
+    el.append(mainLine, audioLine);
     parent.appendChild(el);
     this.element = el;
+    this.mainLine = mainLine;
+    this.audioLine = audioLine;
+    DebugHud.active = this;
     this.updateTelemetry(
       {
         handedness: 'right',
@@ -100,7 +137,9 @@ export class DebugHud {
     const nextText = `DEBUG HUD | hand(${telemetry.handedness}): ${telemetry.handState} | skin: ${skinText} | strikes: ${telemetry.strikeCount} | speed: ${speedText} | radial: ${radialText}`;
 
     if (nextText !== this.lastText) {
-      this.element.textContent = nextText;
+      if (this.mainLine !== null) {
+        this.mainLine.textContent = nextText;
+      }
       this.element.dataset.handState = telemetry.handState;
       this.element.dataset.strikeCount = String(telemetry.strikeCount);
       this.element.dataset.lastSpeed = telemetry.lastStrikeSpeedMps.toFixed(3);
@@ -114,9 +153,20 @@ export class DebugHud {
     this.lastRenderedHandState = telemetry.handState;
   }
 
+  updateAudioProbe(probe: DebugHudAudioProbe): void {
+    if (this.audioLine === null) {
+      return;
+    }
+    const nextText = formatAudioProbe(probe);
+    if (nextText !== this.lastAudioText) {
+      this.audioLine.textContent = nextText;
+      this.lastAudioText = nextText;
+    }
+  }
+
   setStatus(statusText: string): void {
-    if (this.element !== null && statusText !== this.lastText) {
-      this.element.textContent = statusText;
+    if (this.mainLine !== null && statusText !== this.lastText) {
+      this.mainLine.textContent = statusText;
       this.lastText = statusText;
     }
   }
@@ -125,7 +175,13 @@ export class DebugHud {
     if (this.element !== null) {
       this.element.remove();
       this.element = null;
+      this.mainLine = null;
+      this.audioLine = null;
       this.lastText = '';
+      this.lastAudioText = '';
+      if (DebugHud.active === this) {
+        DebugHud.active = null;
+      }
       this.lastRenderedStrikeCount = -1;
       this.lastRenderedHandState = null;
     }

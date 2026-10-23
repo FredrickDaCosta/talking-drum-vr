@@ -2,6 +2,14 @@ import { createSystem, type UIKit, UIKitMLAsset, Vector3, VisibilityState } from
 import { APP_CONFIG } from './app/config.js';
 import { getAppFlags } from './app/flags.js';
 import { TalkingDrum } from './app/talking-drum-component.js';
+import { drumAudio } from './audio/audio-unlock.js';
+import {
+  countXrInputSourcesInto,
+  evaluateXrInputNotice,
+  type XrInputCounts,
+  type XrInputNoticeState,
+  xrInputNoticeMessage,
+} from './platform/xr-input-notice.js';
 import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
 
@@ -11,6 +19,12 @@ export class PanelSystem extends createSystem({
   private fpsOverlay: FpsOverlay | null = null;
   private headWorldPos = new Vector3();
   private calibratedInSession = false;
+  private readonly inputCounts: XrInputCounts = { hands: 0, controllers: 0 };
+  private sessionStartMs = 0;
+  private lastHandSeenMs = -Infinity;
+  private lastInputCheckMs = -Infinity;
+  private inputNoticeState: XrInputNoticeState = 'pending';
+  private setStatusMessage: (message: string | null) => void = () => {};
 
   init(): void {
     const flags = getAppFlags();
@@ -41,7 +55,11 @@ export class PanelSystem extends createSystem({
       }
     };
 
+    this.setStatusMessage = updateStatusMessage;
+
     const launchXR = (): void => {
+      // Audio needs a user gesture; a hand strike inside XR is not one, so unlock here.
+      drumAudio.unlock();
       void requestImmersiveVrSession({
         world: this.world,
         onStatusMessage: updateStatusMessage,
@@ -84,9 +102,16 @@ export class PanelSystem extends createSystem({
         const is2D = visibilityState === VisibilityState.NonImmersive;
         if (is2D) {
           this.calibratedInSession = false;
+          if (xrInputNoticeMessage(this.inputNoticeState) !== null) {
+            updateStatusMessage(null);
+          }
         } else {
           updateStatusMessage(null);
+          this.sessionStartMs = performance.now();
+          this.lastHandSeenMs = -Infinity;
+          this.lastInputCheckMs = -Infinity;
         }
+        this.inputNoticeState = 'pending';
         if (xrButton != null && exitButton != null && this.world.xrEnabled) {
           xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
           exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
@@ -103,6 +128,9 @@ export class PanelSystem extends createSystem({
     this.fpsOverlay?.update(delta);
 
     const isImmersive = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    if (isImmersive) {
+      this.updateInputNotice();
+    }
     if (isImmersive && !this.calibratedInSession) {
       this.player.head.updateWorldMatrix(true, false);
       this.headWorldPos.setFromMatrixPosition(this.player.head.matrixWorld);
@@ -120,6 +148,36 @@ export class PanelSystem extends createSystem({
         }
         this.calibratedInSession = true;
       }
+    }
+  }
+
+  /** Shows the hands-required notice when no tracked hand appears within the grace period. */
+  private updateInputNotice(): void {
+    const nowMs = performance.now();
+    const { handDetectionGraceMs, recheckIntervalMs } = APP_CONFIG.xrInputNotice;
+    if (nowMs - this.lastInputCheckMs < recheckIntervalMs) {
+      return;
+    }
+    this.lastInputCheckMs = nowMs;
+    countXrInputSourcesInto(this.world.xrSession?.inputSources, this.inputCounts);
+    if (this.inputCounts.hands > 0) {
+      this.lastHandSeenMs = nowMs;
+    }
+    const next = evaluateXrInputNotice(
+      nowMs,
+      this.sessionStartMs,
+      this.lastHandSeenMs,
+      this.inputCounts,
+      handDetectionGraceMs,
+    );
+    if (next === this.inputNoticeState) {
+      return;
+    }
+    const wasShowing = xrInputNoticeMessage(this.inputNoticeState) !== null;
+    this.inputNoticeState = next;
+    const message = xrInputNoticeMessage(next);
+    if (message !== null || wasShowing) {
+      this.setStatusMessage(message);
     }
   }
 }
