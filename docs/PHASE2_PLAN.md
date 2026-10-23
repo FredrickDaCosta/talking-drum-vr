@@ -363,6 +363,16 @@ borrowed-Quest session needs the key numbers inside VR.
     (`FrameStatsWindow`); fingertip poses are read with `XRFrame.fillPoses` into a preallocated buffer.
   - Strings are built only at 4 Hz.
 
+- **Refresh cost fix (after #28):**
+  - The first version redrew a 1024 × 768 canvas and rebuilt its mipmaps on every 4 Hz refresh. In CI's
+    software renderer that caused frame spikes of about 230 ms, which broke scripted strikes in the lesson
+    e2e tests on main.
+  - The canvas is now 640 × 480. That is about the Quest 3 pixel density for 0.24 m at 0.55 m, and the
+    physical text size is unchanged.
+  - Mipmaps are off.
+  - Measured locally: frames that redraw the panel went from +17–35 ms over other frames to no measurable
+    difference.
+
 ### 6.3 Hands-only controls (`src/debug/panel-touch.ts`)
 
 - **Touch:** an index fingertip inside the panel outline and within `touchDepthMeters` (3 cm) of its plane.
@@ -400,7 +410,7 @@ borrowed-Quest session needs the key numbers inside VR.
   - a right fingertip touch adds one mark, a left touch hides the panel, and the keyboard shortcuts work
   - zero console errors
 - **UNVERIFIED (Quest only):**
-  - legibility of the 38 px text (~6.7 mm) at ~0.55 m
+  - legibility of the 24 px text on the 640 × 480 canvas (font size ~9 mm on the panel) at ~0.55 m
   - whether the low-right position is comfortable to glance at
   - fingertip touch reliability with real hand tracking (in IWER the fingertip is placed exactly)
   - Quest Browser `XRFrame.fillPoses` support for the touch check: if it is missing, touches do nothing but
