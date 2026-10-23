@@ -20,6 +20,12 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
       # three is an npm alias (npm:super-three@0.181.0); both names are listed because it is
       # unverified which one Dependabot matches. three is 0.x, so each release (0.181 -> 0.182)
       # is a semver-minor bump and is held back too; @types/three must track the same release.
