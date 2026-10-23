@@ -9,7 +9,12 @@ export interface DrumAudioPlayParams {
 }
 
 export type DrumAudioPlayOutcome =
-  'played' | 'invalid-velocity' | 'no-context' | 'context-not-running' | 'buffer-not-ready';
+  | 'played'
+  | 'invalid-velocity'
+  | 'invalid-time'
+  | 'no-context'
+  | 'context-not-running'
+  | 'buffer-not-ready';
 
 export type DrumAudioContextState = AudioContextState | 'no-context' | 'unsupported';
 
@@ -47,6 +52,9 @@ export interface DrumAudioDiagnostics {
   lastPlaybackRate: number;
   /** performance.now() at play() minus performance.now() at StrikeSystem frame entry (ms). */
   lastSoftwarePipelineMs: number;
+  /** playAt() calls (lesson demos) and the voices they scheduled; kept apart from strike counters. */
+  scheduledCalls: number;
+  scheduledVoices: number;
   /** AudioContext.baseLatency in ms, NaN when unavailable. */
   baseLatencyMs: number;
   /** AudioContext.outputLatency in ms, NaN when unavailable. */
@@ -129,6 +137,8 @@ export class DrumAudio {
     lastGain: 0,
     lastPlaybackRate: 1,
     lastSoftwarePipelineMs: Number.NaN,
+    scheduledCalls: 0,
+    scheduledVoices: 0,
     baseLatencyMs: Number.NaN,
     outputLatencyMs: Number.NaN,
   };
@@ -153,6 +163,11 @@ export class DrumAudio {
 
   get context(): AudioContext | null {
     return this.ctx;
+  }
+
+  /** AudioContext.currentTime in seconds, or NaN before unlock(). The clock for playAt(). */
+  get currentTime(): number {
+    return this.ctx === null ? Number.NaN : this.ctx.currentTime;
   }
 
   /** Renders the placeholder buffer once (idempotent). Does not need a user gesture. */
@@ -325,6 +340,23 @@ export class DrumAudio {
     return outcome;
   }
 
+  /**
+   * Schedules one drum voice at `whenSec` on the AudioContext clock (lesson demos). Times in the
+   * past start immediately. Does not touch the strike counters or the software-pipeline probe.
+   */
+  playAt(whenSec: number, params: DrumAudioPlayParams): DrumAudioPlayOutcome {
+    const d = this.diagnostics;
+    d.scheduledCalls += 1;
+    if (!Number.isFinite(whenSec)) {
+      return 'invalid-time';
+    }
+    const outcome = this.startVoice(params, Number.NaN, whenSec);
+    if (outcome === 'played') {
+      d.scheduledVoices += 1;
+    }
+    return outcome;
+  }
+
   refreshContextDiagnostics(): void {
     const ctx = this.ctx;
     if (ctx === null) {
@@ -343,9 +375,11 @@ export class DrumAudio {
     this.diagnostics.activeVoices = active;
   }
 
+  /** `whenSec` NaN = now (a strike); otherwise an AudioContext time (a scheduled demo voice). */
   private startVoice(
     params: DrumAudioPlayParams,
     frameEntryPerfNowMs: number,
+    whenSec = Number.NaN,
   ): DrumAudioPlayOutcome {
     if (typeof params?.velocity !== 'number' || !Number.isFinite(params.velocity)) {
       return 'invalid-velocity';
@@ -368,19 +402,27 @@ export class DrumAudio {
     const voiceIndex = this.nextVoice;
     const voiceGain = this.voices[voiceIndex];
     this.nextVoice = (voiceIndex + 1) % this.voices.length;
-    voiceGain.gain.value = gain;
 
     const source = ctx.createBufferSource();
     source.buffer = this.buffer;
     source.playbackRate.value = playbackRate;
     source.connect(voiceGain);
 
-    this.diagnostics.lastSoftwarePipelineMs = this.deps.now() - frameEntryPerfNowMs;
-    source.start(0);
-    this.voiceEndTimes[voiceIndex] = ctx.currentTime + this.buffer.duration / playbackRate;
+    if (Number.isNaN(whenSec)) {
+      voiceGain.gain.value = gain;
+      this.diagnostics.lastSoftwarePipelineMs = this.deps.now() - frameEntryPerfNowMs;
+      source.start(0);
+      this.voiceEndTimes[voiceIndex] = ctx.currentTime + this.buffer.duration / playbackRate;
+      this.diagnostics.lastGain = gain;
+      this.diagnostics.lastPlaybackRate = playbackRate;
+      return 'played';
+    }
 
-    this.diagnostics.lastGain = gain;
-    this.diagnostics.lastPlaybackRate = playbackRate;
+    // The pooled gain may still be sounding an earlier voice, so change it at the start time.
+    const startSec = Math.max(whenSec, ctx.currentTime);
+    voiceGain.gain.setValueAtTime(gain, startSec);
+    source.start(startSec);
+    this.voiceEndTimes[voiceIndex] = startSec + this.buffer.duration / playbackRate;
     return 'played';
   }
 

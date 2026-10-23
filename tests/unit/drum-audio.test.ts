@@ -23,7 +23,10 @@ function createMockContext(initialState: AudioContextState = 'running') {
     connect: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
   }> = [];
-  const gains: Array<{ gain: MockParam; connect: ReturnType<typeof vi.fn> }> = [];
+  const gains: Array<{
+    gain: MockParam & { setValueAtTime: ReturnType<typeof vi.fn> };
+    connect: ReturnType<typeof vi.fn>;
+  }> = [];
   const param = (): MockParam => ({ value: 0 });
   const ctx = {
     state: initialState as AudioContextState,
@@ -58,7 +61,7 @@ function createMockContext(initialState: AudioContextState = 'running') {
       connect: vi.fn(),
     })),
     createGain: vi.fn(() => {
-      const g = { gain: { value: 1 }, connect: vi.fn() };
+      const g = { gain: { value: 1, setValueAtTime: vi.fn() }, connect: vi.fn() };
       gains.push(g);
       return g;
     }),
@@ -410,5 +413,69 @@ describe('DrumAudio safe resume handler', () => {
     expect(sources).toHaveLength(0); // but the skipped hit is never started afterwards.
     expect(audio.play({ velocity: 1 })).toBe('played'); // the next hit plays normally
     expect(sources).toHaveLength(1);
+  });
+});
+
+describe('DrumAudio.playAt (lesson demos on the audio clock)', () => {
+  it('schedules voices at AudioContext times with the gain applied at the start time', async () => {
+    const { audio, ctx, sources, gains } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    ctx.currentTime = 10;
+    expect(audio.currentTime).toBe(10);
+    expect(audio.playAt(10.15, { velocity: 1.5, pitchRatio: 0.75 })).toBe('played');
+    expect(audio.playAt(10.75, { velocity: 1.5, pitchRatio: 1.33 })).toBe('played');
+
+    expect(sources).toHaveLength(2);
+    expect(sources[0].start).toHaveBeenCalledWith(10.15);
+    expect(sources[1].start).toHaveBeenCalledWith(10.75);
+    expect(sources[0].playbackRate.value).toBe(0.75);
+    expect(sources[1].playbackRate.value).toBe(1.33);
+    const g = strikeSpeedToGain(1.5, audioConfig);
+    expect(gains[0].gain.setValueAtTime).toHaveBeenCalledWith(g, 10.15);
+    expect(gains[1].gain.setValueAtTime).toHaveBeenCalledWith(g, 10.75);
+    // The gain a currently sounding voice uses is not changed immediately.
+    expect(gains[0].gain.value).toBe(1);
+  });
+
+  it('keeps strike diagnostics separate and counts scheduled voices', async () => {
+    const { audio } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    audio.playAt(0.5, { velocity: 1 });
+    const d = audio.diagnostics;
+    expect(d.scheduledCalls).toBe(1);
+    expect(d.scheduledVoices).toBe(1);
+    expect(d.playCalls).toBe(0);
+    expect(d.voicesStartedCount).toBe(0);
+    expect(d.contextStateAtFirstStrike).toBe('no-strike-yet');
+    expect(Number.isNaN(d.lastSoftwarePipelineMs)).toBe(true);
+  });
+
+  it('starts a past time immediately and counts it as active until it ends', async () => {
+    const { audio, ctx, sources } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    ctx.currentTime = 5;
+    audio.playAt(4, { velocity: 1 });
+    expect(sources[0].start).toHaveBeenCalledWith(5);
+    audio.refreshContextDiagnostics();
+    expect(audio.diagnostics.activeVoices).toBe(1);
+    ctx.currentTime = 5 + 0.65 + 0.01;
+    audio.refreshContextDiagnostics();
+    expect(audio.diagnostics.activeVoices).toBe(0);
+  });
+
+  it('rejects a non-finite time and plays nothing without a running context', async () => {
+    const { audio, ctx, sources } = createReadyDrumAudio('suspended');
+    ctx.resume.mockImplementation(() => Promise.resolve());
+    expect(Number.isNaN(audio.currentTime)).toBe(true);
+    expect(audio.playAt(1, { velocity: 1 })).toBe('no-context');
+    await audio.prepare();
+    audio.unlock();
+    expect(audio.playAt(Number.NaN, { velocity: 1 })).toBe('invalid-time');
+    expect(audio.playAt(1, { velocity: 1 })).toBe('context-not-running');
+    expect(sources).toHaveLength(0);
+    expect(audio.diagnostics.scheduledVoices).toBe(0);
   });
 });

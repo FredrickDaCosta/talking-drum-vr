@@ -1,6 +1,7 @@
 # Phase 2 Plan: "Listen, then echo" (`docs/PHASE2_PLAN.md`)
 
-> **Status:** P2a (squeeze and pitch) in review. P2b and P2c not started. Source: CTO design brief, 2026-10-23.
+> **Status:** P2a merged and deployed (#25). P2b (lesson engine and content) in review. P2c not started.
+> Source: CTO design brief, 2026-10-23.
 
 ## 1. Game
 
@@ -23,11 +24,11 @@
 
 ## 2. Steps
 
-| Step    | Scope                                                                                                                                                              | Status      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| **P2a** | Pitch-hand squeeze, calibration, pitch mapping and L/M/H bands, pitch ladder, debug HUD                                                                            | In review   |
-| **P2b** | Lesson engine and content: a typed data file validated by `content:validate`; each entry has `reviewStatus: draft \| verified`; Yoruba text with proper diacritics | Not started |
-| **P2c** | Onboarding, end screen, polish                                                                                                                                     | Not started |
+| Step    | Scope                                                                                                                                                              | Status       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| **P2a** | Pitch-hand squeeze, calibration, pitch mapping and L/M/H bands, pitch ladder, debug HUD                                                                            | Merged (#25) |
+| **P2b** | Lesson engine and content: a typed data file validated by `content:validate`; each entry has `reviewStatus: draft \| verified`; Yoruba text with proper diacritics | In review    |
+| **P2c** | Onboarding, end screen, polish                                                                                                                                     | Not started  |
 
 - **Content:** Fredrick supplies it (starter list in review). **No Yoruba content is invented in code.**
 - **Tuning:** a real-Quest session is planned around Nov 1. Every threshold below is a config value
@@ -101,3 +102,112 @@
   so a true fist is likely testable only on a headset.
 - **UNVERIFIED until a Quest session:** real hand-tracking curl ranges, comfort, latency, and whether the
   defaults and thresholds feel right.
+
+## 4. P2b design
+
+### 4.1 Content (`src/content/lessons.ts`)
+
+- **Entry fields:** `id`, `level` (1..3), `text` (Yoruba, NFC), `gloss`, `syllables`, `tones` (`L`/`M`/`H`,
+  one per syllable), optional `note`, and `reviewStatus` (`draft` or `verified`). The engine reads only this
+  file, so words can be corrected without code changes.
+- **Level 1:** five tone-only drills with no words (`M`, `H`, `L`, `H L`, `L H M`), marked `verified`
+  because they contain no Yoruba.
+- **Levels 2 and 3:** the brief's starter list, all `draft`.
+- **Splits I am unsure about** (Fredrick or a native speaker should confirm):
+  - "gb" in `igba`/`igbá`/`ìgbà` is kept as one consonant (`i-gba`).
+  - The syllabic nasal: `ọrùn`/`ọ̀run` is split `ọ-rùn`/`ọ̀-run`, with "n" kept in the final syllable rather
+    than counted as its own tone-bearing syllable.
+  - The long vowel in `Ẹ káàbọ̀` is two strikes (`ká-à`).
+  - `ilé` in `Ẹ kú ilé` is split `i-lé`, with the "i" as its own syllable.
+  - All tones are copied from the brief and are unverified.
+- **`content:validate`** (`src/content/validate-lessons.ts`, also run in the unit tests):
+  - unique non-empty ids; level 1..3; a valid `reviewStatus`
+  - tones count = syllables count; tones only L, M or H
+  - NFC on text, gloss, note and syllables; non-empty gloss
+  - level 1 has no text; for levels 2–3 the syllables must spell the text (spaces and hyphens ignored)
+  - at least `minEntriesPerLevel` entries per level
+  - Drafts are listed but never fail the build.
+
+### 4.2 State machine (`src/game/lesson-machine.ts`, pure reducer)
+
+`TITLE` -(strike)-> `CALIBRATION` -(squeeze calibration done, failed or skipped)-> `LEVEL_INTRO` -> `DEMO` ->
+`YOUR_TURN` -> `EVALUATE` -> `FEEDBACK`. From there:
+
+- correct → next phrase `DEMO`, or `LEVEL_COMPLETE` after the last phrase
+- a miss on try 1 or 2 → retry `DEMO`
+- a miss on try 3 → answer `DEMO`, then 0 stars and the next phrase
+
+`LEVEL_COMPLETE` -> next `LEVEL_INTRO`, or `END` (total stars) -(strike)-> `TITLE`.
+
+- **Events:** `STRIKE {band, timeMs}`, `TICK {timeMs}` (every frame) and `CALIBRATION_READY`. The reducer
+  returns the same object when nothing changes, so idle frames allocate nothing. Effects (`PLAY_DEMO`) ride on
+  the new state and are run once by `LessonSystem`.
+- **Calibration:** the P2a calibration still starts at XR session start. While it runs, the title shows its
+  prompt. A strike on the title moves to `CALIBRATION`, which passes as soon as calibration has finished
+  (`?calib=0` → `skipped`).
+- **Demo:** `DrumAudio.playAt(t0 + i × interval, { velocity: demoVelocityMps, pitchRatio: bandRatios[tone] })`
+  on the `AudioContext` clock. The highlighted syllable and the ladder marker follow the audio clock, or
+  `performance.now()` if audio is not running.
+- **Your turn:** each right-hand strike records the band latched on its frame (P2a). The attempt ends at n
+  strikes, or `attemptGapMs` after the last strike (incomplete = wrong). With no strike `idleReplayMs` after
+  the cue, the demo replays without costing a try. Strikes during a demo or feedback still sound but are not
+  scored.
+- **Scoring:** band and order only (rhythm is not scored). Stars are 3/2/1 for a correct 1st/2nd/3rd try;
+  after three misses, 0.
+- **Leaving XR** returns to the title. The calibration is kept for the page session.
+- **Controls:** the drum only. There are no UI buttons.
+
+### 4.3 Config (`APP_CONFIG.lesson`, `APP_CONFIG.lessonPanel`)
+
+| Value                                             | Setting                                                                                 |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `bandRatios`                                      | L 0.75, M 1.0, H 1.33                                                                   |
+| `demoVelocityMps`                                 | 1.5 m/s (fixed demo loudness)                                                           |
+| `syllableIntervalMs` / `demoLeadInMs`             | 600 / 150                                                                               |
+| `postDemoPauseMs`                                 | 500                                                                                     |
+| `attemptGapMs` / `idleReplayMs`                   | 4000 / 10000                                                                            |
+| `maxTries`                                        | 3                                                                                       |
+| `feedbackMs` / `levelIntroMs` / `levelCompleteMs` | 2000 / 2500 / 3000                                                                      |
+| `phrasesPerLevel` (`minEntriesPerLevel`)          | L1 5, L2 6, L3 4                                                                        |
+| `lessonPanel`                                     | 0.32 × 0.16 m, centre 0.30 m above and 0.05 m behind the drum origin; 1024 × 512 canvas |
+
+**Pacing estimate (UNVERIFIED):** with the timings above, an all-correct session takes about 2–3 minutes. A
+player who needs retries takes longer, up to about 6 minutes when every phrase needs all three tries. The
+brief's 6–8 minutes therefore needs more phrases per level, or the P2c onboarding. This is a config change
+once more content is verified.
+
+### 4.4 Display
+
+- **Panel:** a canvas-texture plane above the drum. It shows:
+  - the word (bold) and the syllables
+  - tone arrows (H up, M flat, L down, in the ladder colours)
+  - the gloss and the state text ("Listen", "Your turn", "Try again", "Well done", "The answer")
+  - the try number and stars
+  - per-syllable marks after an attempt
+- **Redraws:** only when the view changes.
+- **Font:** UIKit's MSDF Inter has 104 glyphs (max U+00FC). It has no ẹ ọ ṣ and no combining marks, so the
+  panel draws with the browser's text shaping and a bundled Noto Sans subset (OFL, ~40 KB for two weights,
+  same-origin, `docs/ASSET_REGISTER.md`).
+  - Verified in headless Chromium: precomposed and decomposed (NFD) forms render identically, including
+    ọ́ and ọ̀ (`tests/e2e/lesson.spec.ts`).
+- **Reach:** every panel corner is ≤ 0.61 m from the default eye (unit-tested; ≈0.59 m).
+- **HUD (`?debug=1`):** `lesson: <phase> | level | phrase | try a/3 | last <result> | stars x/y`.
+  `?lesson=<id>` starts at that phrase.
+
+### 4.5 Verification limits
+
+- **Verified in CI (IWER):**
+  - a full lesson pass (title strike → calibration skipped → intro → scheduled demo → echo → 3 stars → next
+    phrase)
+  - a wrong-then-right path (2 stars)
+  - zero console errors
+  - the diacritics specimen
+- **Not reachable in IWER:** IWER has no fist pose, so with defaults the left hand reaches only L (default)
+  and M (point), and with calibration only L and H. Band H in a lesson, incomplete attempts, idle replay, the
+  third-failure answer and level/END transitions are covered by the reducer unit tests.
+- **UNVERIFIED (Quest only):**
+  - how the demo sounds through Quest speakers, and whether the demo and highlight stay in sync
+  - panel legibility and placement when seated
+  - whether 600 ms per syllable and a 4 s gap feel right
+  - session length with real players
+- **UNVERIFIED (content):** every level-2/3 word, split and tone until a native-speaker review.

@@ -5,6 +5,7 @@
  * - ?debug=1 : enables the debug HUD
  * - ?hand=left|right : overrides the primary striking hand
  * - ?calib=0 : skips the squeeze-hand calibration (default open/fist values are used)
+ * - ?lesson=<id> : starts the lesson session at that phrase id (from src/content/lessons.ts)
  */
 
 import type { Handedness } from './config.js';
@@ -15,6 +16,8 @@ export interface AppFlags {
   readonly hand?: Handedness;
   /** Present (false) only when ?calib=0 asks to skip squeeze calibration. */
   readonly calib?: false;
+  /** Lesson phrase id to start at (lower-case letters, digits and hyphens only). */
+  readonly lesson?: string;
 }
 
 function isEnabledFlag(value: string | null): boolean {
@@ -44,14 +47,24 @@ function parseHandFlag(value: string | null): Handedness | undefined {
   return undefined;
 }
 
+function parseLessonFlag(value: string | null): string | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  return /^[a-z0-9-]{1,64}$/.test(normalized) ? normalized : undefined;
+}
+
 export function parseAppFlags(search: string): AppFlags {
   const params = new URLSearchParams(search.startsWith('?') ? search : `?${search}`);
   const hand = parseHandFlag(params.get('hand'));
+  const lesson = parseLessonFlag(params.get('lesson'));
   return {
     xrfps: isEnabledFlag(params.get('xrfps')),
     debug: isEnabledFlag(params.get('debug')),
     ...(hand !== undefined ? { hand } : {}),
     ...(isDisabledFlag(params.get('calib')) ? { calib: false as const } : {}),
+    ...(lesson !== undefined ? { lesson } : {}),
   };
 }
 

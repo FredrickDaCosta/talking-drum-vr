@@ -7,8 +7,9 @@
 
 ## Current Stage
 
-**Phase 2, step P2a (squeeze and pitch): IN REVIEW** on branch `feat/p2a-squeeze-pitch`. The PR is open;
-do NOT merge until the CTO approves. M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+**Phase 2, step P2b (lesson engine and content): IN REVIEW** on branch `feat/p2b-lessons`. The PR is open;
+do NOT merge until the CTO approves. P2a was ACCEPTED and merged in #25 (`2487027`), then deployed (Deploy run
+40013067378, live smoke 7 passed). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
 diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
 `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
 CTO/PM writes the task prompts and Fredrick relays them.
@@ -97,12 +98,18 @@ CTO/PM writes the task prompts and Fredrick relays them.
 
 ### Phase 2 (see `docs/PHASE2_PLAN.md`)
 
-- [x] P2a in review: pitch-hand squeeze (tip → own-knuckle curl / palm length), guided open/fist
+- [x] P2a merged (#25, `2487027`) and deployed: pitch-hand squeeze (tip → own-knuckle curl / palm length), guided open/fist
       calibration (`?calib=0` skips it), log pitch mapping 0.75–1.0–1.33, L/M/H bands with hysteresis,
       strike-frame latch into `DrumAudio.play({ velocity, pitchRatio })`, pitch ladder, debug HUD pitch line.
 - [ ] Fredrick: P2a emulator checklist (`docs/TEST_PLAN.md §3.3`) after deploy.
-- [ ] P2b: lesson engine and content (typed data file, `content:validate`, `reviewStatus`, diacritics;
-      content from Fredrick only).
+- [x] P2b in review (`feat/p2b-lessons`): lesson data and validation, a pure lesson reducer and
+      `LessonSystem`, `DrumAudio.playAt` demos on the audio clock, the canvas lesson panel with a bundled Noto
+      Sans subset for Yoruba diacritics, a HUD lesson line, and `?lesson=<id>`. See `docs/PHASE2_PLAN.md §4`.
+- [ ] Fredrick: P2b emulator checklist (`docs/TEST_PLAN.md §3.4`) after deploy.
+- [ ] Fredrick / native speaker: review the 16 draft L2/L3 entries (splits flagged in `PHASE2_PLAN.md §4.1`)
+      and set `reviewStatus: 'verified'`.
+- [ ] Pacing: an all-correct session is about 2–3 min (UNVERIFIED). Raise `phrasesPerLevel` once more content
+      is verified, to reach the 6–8 min target.
 - [ ] P2c: onboarding, end screen, polish.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 

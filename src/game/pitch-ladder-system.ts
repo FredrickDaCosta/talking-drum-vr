@@ -10,6 +10,7 @@ import {
 import { APP_CONFIG, type PitchBand } from '../app/config.js';
 import { TalkingDrum } from '../app/talking-drum-component.js';
 import { pitchHand } from '../input/left-hand-pitch.js';
+import { ladderOverride } from './ladder-override.js';
 import { bandCentreSqueezes, markerHeight } from './pitch-ladder-layout.js';
 
 const BANDS: readonly PitchBand[] = ['L', 'M', 'H'];
@@ -18,7 +19,8 @@ const DIM_FACTOR = 0.3;
 
 /**
  * Three-rung pitch indicator beside the drum (left side, for a left-hand squeeze). The marker
- * follows the live squeeze; the rung for the current band is lit. Basic geometry only, built once;
+ * follows the live squeeze (or the lesson demo's tone, see ladder-override.ts); the rung for the
+ * current band is lit. Basic geometry only, built once;
  * the per-frame update only moves existing objects and swaps pre-made materials.
  */
 export class PitchLadderSystem extends createSystem({
@@ -37,6 +39,7 @@ export class PitchLadderSystem extends createSystem({
   private readonly scratch = new Vector3();
   private shownBand: PitchBand | null = null;
   private shownTracked: boolean | null = null;
+  private centres: [number, number, number] = [0.165, 0.5, 0.835];
 
   init(): void {
     const height = APP_CONFIG.pitchLadder.heightMeters;
@@ -50,6 +53,7 @@ export class PitchLadderSystem extends createSystem({
     this.root.add(rail);
 
     const centres = bandCentreSqueezes(APP_CONFIG.pitch);
+    this.centres = centres;
     const rungGeometry = new BoxGeometry(0.06, 0.012, 0.012);
     for (let i = 0; i < BANDS.length; i += 1) {
       const colour = BAND_COLOURS[BANDS[i]];
@@ -96,15 +100,20 @@ export class PitchLadderSystem extends createSystem({
     }
     this.root.position.copy(this.scratch);
 
-    this.marker.position.y = markerHeight(pitchHand.squeeze);
+    // During a lesson demo the ladder shows the demo's tone instead of the live squeeze.
+    const demo = ladderOverride.active;
+    const band = demo ? ladderOverride.band : pitchHand.band;
+    this.marker.position.y = markerHeight(
+      demo ? this.centres[BANDS.indexOf(band)] : pitchHand.squeeze,
+    );
 
-    const tracked = pitchHand.tracking !== 'LOST';
+    const tracked = demo || pitchHand.tracking !== 'LOST';
     if (tracked !== this.shownTracked) {
       this.shownTracked = tracked;
       this.marker.material = tracked ? this.markerTrackedMat : this.markerLostMat;
     }
-    if (pitchHand.band !== this.shownBand) {
-      this.shownBand = pitchHand.band;
+    if (band !== this.shownBand) {
+      this.shownBand = band;
       for (let i = 0; i < BANDS.length; i += 1) {
         this.rungs[i].material = BANDS[i] === this.shownBand ? this.litMats[i] : this.dimMats[i];
       }
