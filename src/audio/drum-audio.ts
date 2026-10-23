@@ -1,4 +1,5 @@
 import { APP_CONFIG, type DrumAudioConfig } from '../app/config.js';
+import { type FeedbackCueKind, renderFeedbackCues } from './feedback-cues.js';
 import { renderGanganPlaceholder } from './gangan-placeholder.js';
 
 export interface DrumAudioPlayParams {
@@ -55,6 +56,12 @@ export interface DrumAudioDiagnostics {
   /** playAt() calls (lesson demos) and the voices they scheduled; kept apart from strike counters. */
   scheduledCalls: number;
   scheduledVoices: number;
+  /** Scheduled (demo) voices stopped early by stopScheduled(). */
+  scheduledStopped: number;
+  /** Feedback cues: ready, played, and the rendered peak of each (for the loudness check). */
+  cuesReady: boolean;
+  cuesPlayed: number;
+  cuePeaks: Record<FeedbackCueKind, number>;
   /** AudioContext.baseLatency in ms, NaN when unavailable. */
   baseLatencyMs: number;
   /** AudioContext.outputLatency in ms, NaN when unavailable. */
@@ -88,6 +95,18 @@ export function sanitisePitchRatio(
   return Math.min(config.maxPitchRatio, Math.max(config.minPitchRatio, pitchRatio));
 }
 
+function peakOf(buffer: AudioBuffer): number {
+  let peak = 0;
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i += 1) {
+    const a = Math.abs(data[i]);
+    if (a > peak) {
+      peak = a;
+    }
+  }
+  return peak;
+}
+
 function secondsToMs(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value * 1000 : Number.NaN;
 }
@@ -95,6 +114,7 @@ function secondsToMs(value: unknown): number {
 export interface DrumAudioDeps {
   createContext: () => AudioContext;
   renderPlaceholder: (sampleRate: number) => Promise<AudioBuffer>;
+  renderCues: (sampleRate: number) => Promise<Record<FeedbackCueKind, AudioBuffer>>;
   now: () => number;
   warn: (message: string, error?: unknown) => void;
   /** True once the page has had a user activation (navigator.userActivation.hasBeenActive). */
@@ -104,6 +124,7 @@ export interface DrumAudioDeps {
 const defaultDeps: DrumAudioDeps = {
   createContext: () => new AudioContext({ latencyHint: 'interactive' }),
   renderPlaceholder: (sampleRate) => renderGanganPlaceholder(sampleRate),
+  renderCues: (sampleRate) => renderFeedbackCues(sampleRate),
   now: () => performance.now(),
   warn: (message, error) => console.warn(message, error),
   hasUserActivation: () =>
@@ -139,6 +160,10 @@ export class DrumAudio {
     lastSoftwarePipelineMs: Number.NaN,
     scheduledCalls: 0,
     scheduledVoices: 0,
+    scheduledStopped: 0,
+    cuesReady: false,
+    cuesPlayed: 0,
+    cuePeaks: { correct: 0, retry: 0 },
     baseLatencyMs: Number.NaN,
     outputLatencyMs: Number.NaN,
   };
@@ -151,6 +176,11 @@ export class DrumAudio {
   private readonly voices: GainNode[] = [];
   /** AudioContext time at which each pooled voice's current sound ends (fixed size, no per-hit allocation). */
   private readonly voiceEndTimes: Float64Array;
+  /** Source started on each pooled voice, and whether it came from playAt() (stoppable). */
+  private readonly voiceSources: (AudioBufferSourceNode | null)[];
+  private readonly voiceScheduled: Uint8Array;
+  private cueGainNode: GainNode | null = null;
+  private cueBuffers: Record<FeedbackCueKind, AudioBuffer> | null = null;
   private nextVoice = 0;
   private unlocked = false;
   private preparePromise: Promise<void> | null = null;
@@ -159,6 +189,8 @@ export class DrumAudio {
     this.config = config;
     this.deps = { ...defaultDeps, ...deps };
     this.voiceEndTimes = new Float64Array(config.voicePoolSize);
+    this.voiceSources = new Array<AudioBufferSourceNode | null>(config.voicePoolSize).fill(null);
+    this.voiceScheduled = new Uint8Array(config.voicePoolSize);
   }
 
   get context(): AudioContext | null {
@@ -170,11 +202,12 @@ export class DrumAudio {
     return this.ctx === null ? Number.NaN : this.ctx.currentTime;
   }
 
-  /** Renders the placeholder buffer once (idempotent). Does not need a user gesture. */
+  /** Renders the placeholder buffer and the feedback cues once (idempotent). No gesture needed. */
   prepare(): Promise<void> {
     if (this.preparePromise === null) {
-      this.preparePromise = this.deps
-        .renderPlaceholder(this.config.placeholderSampleRateHz)
+      const rate = this.config.placeholderSampleRateHz;
+      const drum = this.deps
+        .renderPlaceholder(rate)
         .then((buffer) => {
           if (this.buffer === null) {
             this.setBuffer(buffer);
@@ -183,6 +216,18 @@ export class DrumAudio {
         .catch((error: unknown) => {
           this.deps.warn('[DrumAudio] Placeholder render failed; strikes will be silent.', error);
         });
+      const cues = this.deps
+        .renderCues(rate)
+        .then((buffers) => {
+          this.cueBuffers = buffers;
+          this.diagnostics.cuePeaks.correct = peakOf(buffers.correct);
+          this.diagnostics.cuePeaks.retry = peakOf(buffers.retry);
+          this.diagnostics.cuesReady = true;
+        })
+        .catch((error: unknown) => {
+          this.deps.warn('[DrumAudio] Feedback cue render failed; cues will be silent.', error);
+        });
+      this.preparePromise = Promise.all([drum, cues]).then(() => undefined);
     }
     return this.preparePromise;
   }
@@ -190,17 +235,9 @@ export class DrumAudio {
   /** Swap in any decoded buffer (e.g. Fredrick's studio recording). */
   setBuffer(buffer: AudioBuffer): void {
     this.buffer = buffer;
-    let peak = 0;
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i += 1) {
-      const a = Math.abs(data[i]);
-      if (a > peak) {
-        peak = a;
-      }
-    }
     this.diagnostics.bufferReady = true;
     this.diagnostics.bufferDurationSec = buffer.duration;
-    this.diagnostics.bufferPeak = peak;
+    this.diagnostics.bufferPeak = peakOf(buffer);
   }
 
   /** Decodes an encoded sample (wav/ogg/mp3 bytes) and makes it the drum voice. Needs unlock() first. */
@@ -357,6 +394,54 @@ export class DrumAudio {
     return outcome;
   }
 
+  /**
+   * Stops demo voices from playAt() that are still scheduled or sounding (XR session end, tab
+   * hidden). Strike voices are left alone. Returns how many were stopped.
+   */
+  stopScheduled(): number {
+    const ctx = this.ctx;
+    if (ctx === null) {
+      return 0;
+    }
+    const now = ctx.currentTime;
+    let stopped = 0;
+    for (let i = 0; i < this.voiceSources.length; i += 1) {
+      const source = this.voiceSources[i];
+      if (source !== null && this.voiceScheduled[i] === 1 && this.voiceEndTimes[i] > now) {
+        try {
+          source.stop();
+        } catch {
+          // Already stopped; nothing to do.
+        }
+        this.voiceEndTimes[i] = now;
+        stopped += 1;
+      }
+    }
+    this.diagnostics.scheduledStopped += stopped;
+    return stopped;
+  }
+
+  /** Plays a feedback cue now, non-spatially, at `cueGain` (quieter than the drum). */
+  playCue(kind: FeedbackCueKind): DrumAudioPlayOutcome {
+    const ctx = this.ctx;
+    if (ctx === null || this.cueGainNode === null) {
+      return 'no-context';
+    }
+    if (ctx.state !== 'running') {
+      return 'context-not-running';
+    }
+    const buffers = this.cueBuffers;
+    if (buffers === null) {
+      return 'buffer-not-ready';
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffers[kind];
+    source.connect(this.cueGainNode);
+    source.start(0);
+    this.diagnostics.cuesPlayed += 1;
+    return 'played';
+  }
+
   refreshContextDiagnostics(): void {
     const ctx = this.ctx;
     if (ctx === null) {
@@ -407,6 +492,8 @@ export class DrumAudio {
     source.buffer = this.buffer;
     source.playbackRate.value = playbackRate;
     source.connect(voiceGain);
+    this.voiceSources[voiceIndex] = source;
+    this.voiceScheduled[voiceIndex] = Number.isNaN(whenSec) ? 0 : 1;
 
     if (Number.isNaN(whenSec)) {
       voiceGain.gain.value = gain;
@@ -439,6 +526,11 @@ export class DrumAudio {
       voiceGain.connect(panner);
       this.voices.push(voiceGain);
     }
+
+    const cueGain = ctx.createGain();
+    cueGain.gain.value = this.config.cueGain;
+    cueGain.connect(ctx.destination);
+    this.cueGainNode = cueGain;
   }
 
   private readonly onStateChange = (): void => {

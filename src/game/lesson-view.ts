@@ -30,6 +30,8 @@ export interface LessonView {
   readonly marks: readonly SyllableMark[];
   /** Stars to draw (earned of max), or null for none. */
   readonly stars: { readonly earned: number; readonly max: number } | null;
+  /** Large instruction lines (title screen controls); empty elsewhere. */
+  readonly instructions: readonly string[];
 }
 
 export interface LessonViewContext {
@@ -37,9 +39,34 @@ export interface LessonViewContext {
   readonly calibrationPrompt: string | null;
   /** Current demo syllable (from the audio clock), or -1. */
   readonly demoIndex: number;
+  /** Hands-required / controller notice (PanelSystem), shown on the title screen. */
+  readonly inputNotice?: string | null;
+  /** The pitch hand is not tracked (pitch held at mid until it is back). */
+  readonly pitchHandLost?: boolean;
+}
+
+export const TITLE_INSTRUCTIONS: readonly string[] = [
+  'Right hand: strike the drum.',
+  'Left hand: squeeze to change the pitch.',
+];
+export const BEGIN_PROMPT = 'Strike the drum to begin.';
+export const PLAY_AGAIN_PROMPT = 'Strike the drum to play again.';
+export const SHOW_LEFT_HAND_MESSAGE = 'Show your left hand to change pitch';
+
+/** Short end-of-session message by share of stars earned. */
+export function endMessage(earned: number, max: number): string {
+  const share = max > 0 ? earned / max : 0;
+  if (share >= 0.8) {
+    return 'Excellent drumming!';
+  }
+  if (share >= 0.5) {
+    return 'Well played!';
+  }
+  return 'Good start. Practice makes the drum talk.';
 }
 
 const NO_MARKS: readonly SyllableMark[] = [];
+const NO_LINES: readonly string[] = [];
 
 function marksFor(state: LessonState, count: number): readonly SyllableMark[] {
   if (state.phase === 'YOUR_TURN') {
@@ -76,6 +103,7 @@ export function buildLessonView(
     highlightIndex: -1,
     marks: NO_MARKS,
     stars: null,
+    instructions: NO_LINES,
   };
 
   switch (state.phase) {
@@ -83,8 +111,9 @@ export function buildLessonView(
       return {
         ...empty,
         header: 'Talking Drum',
-        status: context.calibrationPrompt ?? 'Strike the drum to begin',
-        detail: 'Listen to the drum, then echo it: right hand strikes, left hand squeezes.',
+        instructions: TITLE_INSTRUCTIONS,
+        status: BEGIN_PROMPT,
+        detail: context.calibrationPrompt ?? context.inputNotice ?? 'Listen, then echo the drum.',
       };
     case 'CALIBRATION':
       return {
@@ -96,9 +125,9 @@ export function buildLessonView(
     case 'LEVEL_INTRO':
       return {
         ...empty,
-        header: levelLabel,
-        status: levelLabel,
-        detail: `${level?.phrases.length ?? 0} to echo. Listen first, then strike the same tones.`,
+        header: 'Talking Drum',
+        status: `Level ${level?.level ?? ''}`,
+        detail: `${level === undefined ? '' : LEVEL_TITLES[level.level]}  ·  ${level?.phrases.length ?? 0} to echo`,
       };
     case 'LEVEL_COMPLETE':
       return {
@@ -111,14 +140,17 @@ export function buildLessonView(
           max: (level?.phrases.length ?? 0) * 3,
         },
       };
-    case 'END':
+    case 'END': {
+      const earned = totalStars(state);
+      const max = maxStars(plan);
       return {
         ...empty,
         header: 'Session complete',
-        status: 'Session complete',
-        detail: 'Strike the drum to play again.',
-        stars: { earned: totalStars(state), max: maxStars(plan) },
+        status: endMessage(earned, max),
+        detail: PLAY_AGAIN_PROMPT,
+        stars: { earned, max },
       };
+    }
     default:
       break;
   }
@@ -133,6 +165,7 @@ export function buildLessonView(
     highlightIndex: -1,
     marks: marksFor(state, tones.length),
     stars: null,
+    instructions: NO_LINES,
   };
   const tryText = `Try ${state.attempt} of ${config.maxTries}`;
 
@@ -153,7 +186,9 @@ export function buildLessonView(
       return {
         ...base,
         status: 'Your turn',
-        detail: `${tryText}  ·  ${state.strikes.length} of ${tones.length} strikes`,
+        detail: context.pitchHandLost
+          ? SHOW_LEFT_HAND_MESSAGE
+          : `${tryText}  ·  ${state.strikes.length} of ${tones.length} strikes`,
       };
     case 'EVALUATE':
     case 'FEEDBACK': {

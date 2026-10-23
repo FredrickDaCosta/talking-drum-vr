@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Phase 2, step P2c (polish, onboarding, length, Quest test plan):**
+  - **Title screen:** it states both controls and "Strike the drum to begin". The welcome panel is hidden for
+    the whole XR session, and the hands-required notice moved to the lesson panel.
+  - **Left hand lost:** during "Your turn" the panel shows "Show your left hand to change pitch"; the pitch
+    holds at mid.
+  - **Session:** L1 has 8 tone drills (3 new; no words), L2 plays all 12 words grouped by minimal sets, and L3
+    all 4 phrases. Each level starts with a plain "Level N" intro.
+  - **Pacing:** retimed; a model in `src/game/session-estimate.ts` gives ≈5.3 min at a normal pace.
+  - **End screen:** total stars and a short message. "Strike the drum to play again" restarts without a
+    reload.
+  - **Feedback sounds:** an original procedural "correct" chime and "try again" tone, quieter than the drum.
+  - **Robustness:** demo voices stop on XR exit or a hidden tab; the demo restarts on return; calibration
+    retries once before using the defaults; strikes during a demo are ignored.
+  - **Debug HUD:** the lesson line shows a per-frame cost reading.
+  - **Docs:** `docs/QUEST_TEST_PLAN.md`, a printable 45-minute Quest session plan.
+- **Content review:** all 16 level-2/3 entries are reviewed by Fredrick and marked `verified`; a second
+  native-speaker review is pending.
 - **Phase 2, step P2b (lesson engine and content):**
   - Typed lesson data (`src/content/lessons.ts`; types in `lesson-types.ts`): 5 level-1 tone drills
     (verified), plus 12 level-2 and 4 level-3 entries from the starter list (all `draft`).

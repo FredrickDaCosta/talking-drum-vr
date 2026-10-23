@@ -1,7 +1,7 @@
 import { APP_CONFIG, type SqueezeConfig } from '../app/config.js';
 
 export type CalibrationPhase =
-  'not-started' | 'skipped' | 'waiting-for-hand' | 'open' | 'fist' | 'done' | 'failed';
+  'not-started' | 'skipped' | 'waiting-for-hand' | 'open' | 'fist' | 'retrying' | 'done' | 'failed';
 
 export function calibrationOpenPrompt(hand: 'left' | 'right' = 'left'): string {
   return `Calibration 1/2: open your ${hand.toUpperCase()} hand wide and hold it still.`;
@@ -13,6 +13,7 @@ export function calibrationDoneMessage(hand: 'left' | 'right' = 'left'): string 
   return `Calibrated. Squeeze your ${hand} hand to change the drum’s pitch.`;
 }
 export const CALIBRATION_FAILED_MESSAGE = 'Calibration unclear, so default hand settings are used.';
+export const CALIBRATION_RETRY_MESSAGE = 'Calibration unclear. Let’s try once more.';
 
 /** Capacity per step; covers 2 s at up to ~250 Hz. */
 const SAMPLE_CAPACITY = 512;
@@ -28,8 +29,9 @@ function medianOf(values: Float64Array, count: number): number {
 /**
  * Guided open/fist calibration for the squeeze hand. Pure and time-driven: call `update(nowMs,
  * rawCurl)` every frame (rawCurl NaN when the hand is not usable). Captures the median curl of each
- * step after a settle period (robust to outliers), then sanity-checks the result. On failure (or
- * when skipped) the config defaults are kept.
+ * step after a settle period (robust to outliers), then sanity-checks the result. A failed run is
+ * retried once ("let's try once more"); if that fails too (or when skipped) the config defaults are
+ * kept and one "default hand settings" message is shown.
  */
 export class SqueezeCalibration {
   phase: CalibrationPhase = 'not-started';
@@ -49,6 +51,8 @@ export class SqueezeCalibration {
   private sampleCount = 0;
   private phaseStartMs = 0;
   private resultUntilMs = -Infinity;
+  /** Calibration runs started in this session (a failed run is retried up to calibrationMaxAttempts). */
+  attempts = 0;
 
   constructor(config: SqueezeConfig = APP_CONFIG.squeeze, hand: 'left' | 'right' = 'left') {
     this.config = config;
@@ -72,11 +76,17 @@ export class SqueezeCalibration {
     this.phase = 'waiting-for-hand';
     this.phaseStartMs = nowMs;
     this.sampleCount = 0;
+    this.attempts = 1;
   }
 
   /** Abort an in-progress calibration (e.g. the XR session ended); it restarts next session. */
   cancel(): void {
-    if (this.phase === 'waiting-for-hand' || this.phase === 'open' || this.phase === 'fist') {
+    if (
+      this.phase === 'waiting-for-hand' ||
+      this.phase === 'open' ||
+      this.phase === 'fist' ||
+      this.phase === 'retrying'
+    ) {
       this.phase = 'not-started';
     }
     this.resultUntilMs = -Infinity;
@@ -107,6 +117,14 @@ export class SqueezeCalibration {
           this.conclude(nowMs);
         }
         return;
+      case 'retrying':
+        if (nowMs >= this.resultUntilMs) {
+          this.attempts += 1;
+          this.phase = 'waiting-for-hand';
+          this.phaseStartMs = nowMs;
+          this.sampleCount = 0;
+        }
+        return;
       default:
         return;
     }
@@ -119,6 +137,9 @@ export class SqueezeCalibration {
     }
     if (this.phase === 'fist') {
       return this.fistPrompt;
+    }
+    if (this.phase === 'retrying') {
+      return CALIBRATION_RETRY_MESSAGE;
     }
     if (nowMs < this.resultUntilMs) {
       return this.phase === 'done' ? this.donePrompt : CALIBRATION_FAILED_MESSAGE;
@@ -173,6 +194,10 @@ export class SqueezeCalibration {
       this.fistCurl = fist;
       this.failureReason = '';
       this.phase = 'done';
+    } else if (this.attempts < c.calibrationMaxAttempts) {
+      // One retry with a short message; the defaults stay in use meanwhile.
+      this.failureReason = reason;
+      this.phase = 'retrying';
     } else {
       this.openCurl = c.defaultOpenCurl;
       this.fistCurl = c.defaultFistCurl;

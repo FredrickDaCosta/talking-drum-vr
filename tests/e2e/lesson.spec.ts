@@ -1,11 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
-import {
-  enterVrWithIwerHands,
-  pitchState,
-  rightHandStrike,
-  setLeftPose,
-  trackErrors,
-} from './iwer-hands.js';
+import { expect, test } from '@playwright/test';
+import { pitchState, setLeftPose, trackErrors } from './iwer-hands.js';
+import { lesson, startLesson, strike, waitForPhase } from './lesson-helpers.js';
 
 /**
  * P2b lesson e2e in IWER hand mode. Limits: IWER has no fist pose, so with default squeeze limits
@@ -13,48 +8,6 @@ import {
  * Band H needs a calibration (point -> H) and then M is unreachable, so these runs use L1 phrases
  * with L and M targets; every other transition is covered by the reducer unit tests.
  */
-
-interface LessonDiag {
-  phase: string;
-  phraseId: string;
-  attempt: number;
-  lastResult: string;
-  feedback: string;
-  strikes: string;
-  stars: Record<string, number>;
-  history: string[];
-  demosStarted: number;
-  demoVoicesScheduled: number;
-  demoIndex: number;
-  fontStatus: string;
-}
-
-async function lesson(page: Page): Promise<LessonDiag> {
-  return page.evaluate(() => {
-    const d = (window as unknown as { __talkingDrumLesson: LessonDiag }).__talkingDrumLesson;
-    return { ...d, stars: { ...d.stars }, history: [...d.history] };
-  });
-}
-
-async function waitForPhase(page: Page, phase: string, timeout = 15_000): Promise<void> {
-  await expect.poll(async () => (await lesson(page)).phase, { timeout }).toBe(phase);
-}
-
-async function strike(page: Page): Promise<void> {
-  expect(await rightHandStrike(page), 'scripted right-hand strike registered').toBe(true);
-}
-
-async function startLesson(page: Page, query: string, pose: 'default' | 'point', band: string) {
-  await enterVrWithIwerHands(page, query);
-  await expect
-    .poll(async () => (await pitchState(page)).tracking, { timeout: 5000 })
-    .toBe('TRACKED');
-  await setLeftPose(page, pose);
-  await expect.poll(async () => (await pitchState(page)).band, { timeout: 3000 }).toBe(band);
-  expect((await lesson(page)).phase).toBe('TITLE');
-  await strike(page); // "Strike the drum to begin"
-  await waitForPhase(page, 'YOUR_TURN');
-}
 
 test.describe('Talking Drum VR — P2b lesson (IWER hands)', () => {
   test('one scripted lesson pass: echo a mid tone on the first try for 3 stars', async ({

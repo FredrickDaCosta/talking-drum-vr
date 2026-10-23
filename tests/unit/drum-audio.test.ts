@@ -22,6 +22,7 @@ function createMockContext(initialState: AudioContextState = 'running') {
     playbackRate: MockParam;
     connect: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
   }> = [];
   const gains: Array<{
     gain: MockParam & { setValueAtTime: ReturnType<typeof vi.fn> };
@@ -71,6 +72,7 @@ function createMockContext(initialState: AudioContextState = 'running') {
         playbackRate: { value: 1 },
         connect: vi.fn(),
         start: vi.fn(),
+        stop: vi.fn(),
       };
       sources.push(s);
       return s;
@@ -93,6 +95,8 @@ function createReadyDrumAudio(
   const audio = new DrumAudio(audioConfig, {
     createContext: () => mock.ctx as unknown as AudioContext,
     renderPlaceholder: () => Promise.resolve(createMockBuffer()),
+    renderCues: () =>
+      Promise.resolve({ correct: createMockBuffer(0.5), retry: createMockBuffer(0.4) }),
     now: () => nowMs,
     warn: () => {},
     hasUserActivation: () => true,
@@ -223,11 +227,12 @@ describe('DrumAudio.play() with a mocked AudioContext', () => {
     await audio.prepare();
     audio.unlock();
     const poolSize = audioConfig.voicePoolSize;
-    expect(ctx.createGain).toHaveBeenCalledTimes(poolSize);
+    // One GainNode per pooled voice plus the single cue gain.
+    expect(ctx.createGain).toHaveBeenCalledTimes(poolSize + 1);
     for (let i = 0; i < poolSize + 2; i += 1) {
       audio.play({ velocity: 1 });
     }
-    expect(ctx.createGain).toHaveBeenCalledTimes(poolSize);
+    expect(ctx.createGain).toHaveBeenCalledTimes(poolSize + 1);
     expect(sources[poolSize].connect).toHaveBeenCalledWith(gains[0]);
     expect(sources[poolSize + 1].connect).toHaveBeenCalledWith(gains[1]);
   });
@@ -257,6 +262,7 @@ describe('DrumAudio.play() with a mocked AudioContext', () => {
     const warn = vi.fn();
     const failing = new DrumAudio(audioConfig, {
       renderPlaceholder: () => Promise.reject(new Error('render failed')),
+      renderCues: () => Promise.resolve({ correct: createMockBuffer(), retry: createMockBuffer() }),
       warn,
     });
     await failing.prepare();
@@ -477,5 +483,54 @@ describe('DrumAudio.playAt (lesson demos on the audio clock)', () => {
     expect(audio.playAt(1, { velocity: 1 })).toBe('context-not-running');
     expect(sources).toHaveLength(0);
     expect(audio.diagnostics.scheduledVoices).toBe(0);
+  });
+});
+
+describe('feedback cues and stopping scheduled demo voices', () => {
+  it('plays cues through their own gain, quieter than the softest drum hit', async () => {
+    const { audio, ctx, sources, gains } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    expect(audio.diagnostics.cuesReady).toBe(true);
+    expect(audio.diagnostics.cuePeaks.correct).toBeCloseTo(0.5, 6);
+    expect(audio.diagnostics.cuePeaks.retry).toBeCloseTo(0.4, 6);
+    const cueGain = gains[audioConfig.voicePoolSize];
+    expect(cueGain.gain.value).toBe(audioConfig.cueGain);
+    expect(cueGain.connect).toHaveBeenCalledWith(ctx.destination);
+    expect(audioConfig.cueGain).toBeLessThan(audioConfig.minGain);
+
+    expect(audio.playCue('correct')).toBe('played');
+    expect(audio.playCue('retry')).toBe('played');
+    expect(sources[0].connect).toHaveBeenCalledWith(cueGain);
+    expect(sources[0].start).toHaveBeenCalledWith(0);
+    expect(audio.diagnostics.cuesPlayed).toBe(2);
+    // Cues never count as strikes.
+    expect(audio.diagnostics.voicesStartedCount).toBe(0);
+  });
+
+  it('skips cues before unlock or while suspended', async () => {
+    const { audio, ctx } = createReadyDrumAudio('suspended');
+    ctx.resume.mockImplementation(() => Promise.resolve());
+    expect(audio.playCue('correct')).toBe('no-context');
+    await audio.prepare();
+    audio.unlock();
+    expect(audio.playCue('correct')).toBe('context-not-running');
+  });
+
+  it('stops only scheduled demo voices that have not ended', async () => {
+    const { audio, ctx, sources } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    ctx.currentTime = 1;
+    audio.play({ velocity: 1 }); // strike voice: never stopped
+    audio.playAt(1.2, { velocity: 1 });
+    audio.playAt(1.8, { velocity: 1 });
+    ctx.currentTime = 1.5;
+    expect(audio.stopScheduled()).toBe(2);
+    expect(sources[0].stop).not.toHaveBeenCalled();
+    expect(sources[1].stop).toHaveBeenCalledTimes(1);
+    expect(sources[2].stop).toHaveBeenCalledTimes(1);
+    expect(audio.diagnostics.scheduledStopped).toBe(2);
+    expect(audio.stopScheduled()).toBe(0);
   });
 });

@@ -2,8 +2,10 @@ import type { LessonEntry } from './lesson-types.js';
 
 /**
  * Lesson content (Phase 2). The engine reads only this file, so words can be corrected without code
- * changes. Every level-2 and level-3 entry is `draft` until Fredrick verifies the text, the syllable
- * split and the tones; draft entries do not break the build (content:validate only counts them).
+ * changes. Level-2 and level-3 entries: reviewed by Fredrick (2026-10-23: tones, meanings,
+ * diacritics, syllable splits) and marked `verified`; second native-speaker review pending. New
+ * entries start as `draft` (content:validate counts drafts but does not fail on them).
+ * Level-1 entries are tone-only drills with no Yoruba words.
  * Strings are Unicode NFC. Starter list from the CTO brief (2026-10-23); no other Yoruba is invented.
  */
 export const LESSONS: readonly LessonEntry[] = [
@@ -53,13 +55,40 @@ export const LESSONS: readonly LessonEntry[] = [
     reviewStatus: 'verified',
   },
   {
+    id: 'l1-l-m',
+    level: 1,
+    text: '',
+    gloss: 'low, then mid',
+    syllables: ['1', '2'],
+    tones: ['L', 'M'],
+    reviewStatus: 'verified',
+  },
+  {
+    id: 'l1-m-h',
+    level: 1,
+    text: '',
+    gloss: 'mid, then high',
+    syllables: ['1', '2'],
+    tones: ['M', 'H'],
+    reviewStatus: 'verified',
+  },
+  {
+    id: 'l1-h-m-l',
+    level: 1,
+    text: '',
+    gloss: 'high, mid, low',
+    syllables: ['1', '2', '3'],
+    tones: ['H', 'M', 'L'],
+    reviewStatus: 'verified',
+  },
+  {
     id: 'l2-oko-mm',
     level: 2,
     text: 'ọkọ',
     gloss: 'husband',
     syllables: ['ọ', 'kọ'],
     tones: ['M', 'M'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-oko-mh',
@@ -68,7 +97,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'hoe',
     syllables: ['ọ', 'kọ́'],
     tones: ['M', 'H'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-oko-ml',
@@ -77,7 +106,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'vehicle',
     syllables: ['ọ', 'kọ̀'],
     tones: ['M', 'L'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-oko-ll',
@@ -86,7 +115,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'spear',
     syllables: ['ọ̀', 'kọ̀'],
     tones: ['L', 'L'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-igba-mm',
@@ -96,7 +125,7 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['i', 'gba'],
     tones: ['M', 'M'],
     note: '"gb" is one consonant.',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-igba-mh',
@@ -106,7 +135,7 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['i', 'gbá'],
     tones: ['M', 'H'],
     note: '"gb" is one consonant.',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-igba-ll',
@@ -116,7 +145,7 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['ì', 'gbà'],
     tones: ['L', 'L'],
     note: '"gb" is one consonant.',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-orun-ml',
@@ -126,7 +155,7 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['ọ', 'rùn'],
     tones: ['M', 'L'],
     note: 'Final "n" marks a nasal vowel, not a separate syllable.',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-orun-lm',
@@ -136,7 +165,7 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['ọ̀', 'run'],
     tones: ['L', 'M'],
     note: 'Final "n" marks a nasal vowel, not a separate syllable.',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-iya-lh',
@@ -145,7 +174,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'mother',
     syllables: ['ì', 'yá'],
     tones: ['L', 'H'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-iya-ll',
@@ -154,7 +183,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'suffering',
     syllables: ['ì', 'yà'],
     tones: ['L', 'L'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l2-baba-lh',
@@ -163,7 +192,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'father',
     syllables: ['bà', 'bá'],
     tones: ['L', 'H'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l3-e-se',
@@ -172,7 +201,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'thank you',
     syllables: ['Ẹ', 'ṣé'],
     tones: ['M', 'H'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l3-e-ku-ile',
@@ -181,7 +210,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'greeting on entering a home',
     syllables: ['Ẹ', 'kú', 'i', 'lé'],
     tones: ['M', 'H', 'M', 'H'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l3-o-dabo',
@@ -190,7 +219,7 @@ export const LESSONS: readonly LessonEntry[] = [
     gloss: 'goodbye',
     syllables: ['Ó', 'dà', 'bọ̀'],
     tones: ['H', 'L', 'L'],
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
   {
     id: 'l3-e-kaabo',
@@ -200,6 +229,6 @@ export const LESSONS: readonly LessonEntry[] = [
     syllables: ['Ẹ', 'ká', 'à', 'bọ̀'],
     tones: ['M', 'H', 'L', 'L'],
     note: 'The long vowel "áà" carries two tones, so it is two strikes (ká-à).',
-    reviewStatus: 'draft',
+    reviewStatus: 'verified',
   },
 ];

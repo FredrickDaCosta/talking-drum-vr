@@ -17,7 +17,13 @@ import {
   totalStars,
 } from '../../src/game/lesson-machine.js';
 import { lessonPanelReachFromDefaultEye } from '../../src/game/lesson-panel-layout.js';
-import { buildLessonView } from '../../src/game/lesson-view.js';
+import { buildLessonView, endMessage } from '../../src/game/lesson-view.js';
+import {
+  estimateSessionMs,
+  FIRST_TRY_PACE,
+  NORMAL_PACE,
+  tryMs,
+} from '../../src/game/session-estimate.js';
 
 const cfg: LessonConfig = APP_CONFIG.lesson;
 
@@ -103,12 +109,13 @@ describe('lesson content (src/content/lessons.ts)', () => {
     expect(report.countsByLevel[3]).toBeGreaterThanOrEqual(cfg.minEntriesPerLevel[3]);
   });
 
-  it('keeps every level-2/3 entry draft until reviewed; level-1 tone drills have no words', () => {
+  it('has every entry reviewed (verified); level-1 tone drills have no words', () => {
+    const report = validateLessons(LESSONS, cfg.minEntriesPerLevel);
+    expect(report.draftIds).toEqual([]);
     for (const e of LESSONS) {
+      expect(e.reviewStatus).toBe('verified');
       if (e.level === 1) {
         expect(e.text).toBe('');
-      } else {
-        expect(e.reviewStatus).toBe('draft');
       }
     }
   });
@@ -186,16 +193,37 @@ describe('buildSessionPlan', () => {
       [3, cfg.phrasesPerLevel[3]],
     ]);
     expect([levelIndex, phraseIndex]).toEqual([0, 0]);
-    expect(maxStars(full)).toBe(3 * (5 + 6 + 4));
+    expect(maxStars(full)).toBe(3 * (8 + 12 + 4));
+  });
+
+  it('plays all 12 level-2 words in file order, grouped by minimal sets', () => {
+    const { plan: full } = buildSessionPlan(LESSONS, cfg);
+    const ids = full.levels[1].phrases.map((p) => p.id);
+    expect(ids).toEqual(LESSONS.filter((e) => e.level === 2).map((e) => e.id));
+    const families = ids.map((id) => id.split('-')[1]);
+    // Each family (oko, igba, orun, iya, baba) is contiguous, so its contrasts are heard together.
+    const seen: string[] = [];
+    for (const f of families) {
+      if (seen[seen.length - 1] !== f) {
+        expect(seen).not.toContain(f);
+        seen.push(f);
+      }
+    }
+    expect(seen).toEqual(['oko', 'igba', 'orun', 'iya', 'baba']);
   });
 
   it('jumps to ?lesson=<id>, inserting a phrase that is outside the played slice', () => {
     expect(buildSessionPlan(LESSONS, cfg, 'l1-l')).toMatchObject({ levelIndex: 0, phraseIndex: 2 });
-    const late = buildSessionPlan(LESSONS, cfg, 'l2-baba-lh');
+    expect(buildSessionPlan(LESSONS, cfg, 'l2-baba-lh')).toMatchObject({
+      levelIndex: 1,
+      phraseIndex: 11,
+    });
+    const short = { ...cfg, phrasesPerLevel: { 1: 5, 2: 6, 3: 4 } };
+    const late = buildSessionPlan(LESSONS, short, 'l2-baba-lh');
     expect(late.levelIndex).toBe(1);
     expect(late.phraseIndex).toBe(0);
     expect(late.plan.levels[1].phrases[0].id).toBe('l2-baba-lh');
-    expect(late.plan.levels[1].phrases).toHaveLength(cfg.phrasesPerLevel[2]);
+    expect(late.plan.levels[1].phrases).toHaveLength(6);
     expect(buildSessionPlan(LESSONS, cfg, 'nope')).toMatchObject({ levelIndex: 0, phraseIndex: 0 });
   });
 });
@@ -365,8 +393,57 @@ describe('reduceLesson', () => {
 
     expect(reduce(s, strike('M', s.enteredAtMs + 10))).toBe(s); // guard
     const again = reduce(s, strike('M', s.enteredAtMs + cfg.feedbackMs));
-    expect(again).toMatchObject({ phase: 'TITLE', levelIndex: 0, phraseIndex: 0, stars: {} });
+    // "Strike the drum to play again": a clean session straight to the level-1 intro.
+    expect(again).toMatchObject({
+      phase: 'LEVEL_INTRO',
+      levelIndex: 0,
+      phraseIndex: 0,
+      attempt: 1,
+      stars: {},
+      strikes: [],
+      lastResult: null,
+      feedback: null,
+      demoReason: null,
+      effects: [],
+    });
     expect(again.version).toBe(s.version + 1);
+    expect(totalStars(again)).toBe(0);
+    // ...and the new session plays through as before.
+    const replay = reduce(again, tick(again.enteredAtMs + cfg.levelIntroMs));
+    expect(replay).toMatchObject({ phase: 'DEMO', phraseIndex: 0, demoReason: 'first' });
+  });
+
+  it('asks for the correct chime and the try-again tone on feedback', () => {
+    const { state, t } = toFirstTurn();
+    const right = reduce(reduce(state, strike('M', t + 100)), tick(t + 200));
+    expect(right.effects).toEqual([{ type: 'PLAY_CUE', cue: 'correct' }]);
+    const wrong = reduce(reduce(state, strike('L', t + 100)), tick(t + 200));
+    expect(wrong.effects).toEqual([{ type: 'PLAY_CUE', cue: 'retry' }]);
+    // The cue is a one-shot: the next transition clears it.
+    expect(reduce(wrong, tick(wrong.enteredAtMs + cfg.feedbackMs)).effects[0]).toMatchObject({
+      type: 'PLAY_DEMO',
+    });
+  });
+
+  it('INTERRUPT restarts a cut-off demo and resets the your-turn wait', () => {
+    let s = createLessonState(0, 1); // phrase b: H L (two syllables)
+    s = reduce(s, strike('M', 0));
+    s = reduce(s, { type: 'CALIBRATION_READY', timeMs: 0 });
+    s = reduce(s, tick(cfg.levelIntroMs));
+    const restarted = reduce(s, { type: 'INTERRUPT', timeMs: 50_000 });
+    expect(restarted).toMatchObject({ phase: 'DEMO', demoReason: 'first', attempt: 1 });
+    expect(restarted.demoStartMs).toBe(50_000 + cfg.demoLeadInMs);
+    expect(restarted.effects[0]).toMatchObject({ type: 'PLAY_DEMO', tones: ['H', 'L'] });
+
+    const turn = reduce(restarted, tick(restarted.demoEndsAtMs + cfg.postDemoPauseMs));
+    const partial = reduce(turn, strike('H', turn.cueAtMs + 10));
+    const resumed = reduce(partial, { type: 'INTERRUPT', timeMs: 90_000 });
+    expect(resumed).toMatchObject({ phase: 'YOUR_TURN', cueAtMs: 90_000, strikes: [] });
+    // No instant idle replay after a long hidden time.
+    expect(reduce(resumed, tick(90_001))).toBe(resumed);
+
+    const title = createLessonState();
+    expect(reduce(title, { type: 'INTERRUPT', timeMs: 1 })).toBe(title);
   });
 
   it('returns the same object on idle ticks (no per-frame allocation)', () => {
@@ -378,12 +455,40 @@ describe('reduceLesson', () => {
 describe('buildLessonView', () => {
   const ctx = { calibrationPrompt: null, demoIndex: -1 };
 
-  it('shows the title prompt, or the calibration prompt while it runs', () => {
+  it('states both controls and the begin prompt on the title; prompts and notices go below', () => {
     const title = createLessonState();
-    expect(buildLessonView(title, plan, ctx).status).toBe('Strike the drum to begin');
+    const view = buildLessonView(title, plan, ctx);
+    expect(view.instructions).toEqual([
+      'Right hand: strike the drum.',
+      'Left hand: squeeze to change the pitch.',
+    ]);
+    expect(view.status).toBe('Strike the drum to begin.');
     expect(
-      buildLessonView(title, plan, { calibrationPrompt: 'Open hand', demoIndex: -1 }).status,
+      buildLessonView(title, plan, { calibrationPrompt: 'Open hand', demoIndex: -1 }).detail,
     ).toBe('Open hand');
+    expect(
+      buildLessonView(title, plan, {
+        calibrationPrompt: null,
+        inputNotice: 'Hands required',
+        demoIndex: -1,
+      }).detail,
+    ).toBe('Hands required');
+  });
+
+  it('shows a plain "Level N" intro', () => {
+    const intro: LessonState = { ...createLessonState(1, 0), phase: 'LEVEL_INTRO' };
+    expect(buildLessonView(intro, plan, ctx)).toMatchObject({
+      status: 'Level 2',
+      detail: 'Tone words  ·  1 to echo',
+    });
+  });
+
+  it('asks for the left hand during "Your turn" when it is not tracked', () => {
+    const { state } = toFirstTurn();
+    expect(buildLessonView(state, plan, ctx).detail).toBe('Try 1 of 3  ·  0 of 1 strikes');
+    expect(buildLessonView(state, plan, { ...ctx, pitchHandLost: true }).detail).toBe(
+      'Show your left hand to change pitch',
+    );
   });
 
   it('shows the word, syllables, tones, highlight and state text', () => {
@@ -422,9 +527,13 @@ describe('buildLessonView', () => {
   it('shows the session summary with total stars at END', () => {
     const end: LessonState = { ...createLessonState(), phase: 'END', stars: { a: 3, b: 1 } };
     expect(buildLessonView(end, plan, ctx)).toMatchObject({
-      status: 'Session complete',
+      header: 'Session complete',
+      status: 'Good start. Practice makes the drum talk.',
+      detail: 'Strike the drum to play again.',
       stars: { earned: 4, max: 9 },
     });
+    expect(endMessage(8, 9)).toBe('Excellent drumming!');
+    expect(endMessage(5, 9)).toBe('Well played!');
   });
 });
 
@@ -433,5 +542,36 @@ describe('lesson panel placement', () => {
     const reach = lessonPanelReachFromDefaultEye();
     expect(reach).toBeLessThanOrEqual(0.61);
     expect(reach).toBeGreaterThan(0.4);
+  });
+});
+
+describe('session length estimate (a model; UNVERIFIED until playtests)', () => {
+  const { plan: full } = buildSessionPlan(LESSONS, cfg);
+  const minutes = (ms: number) => ms / 60_000;
+
+  it('models one try as demo + pause + echo + feedback', () => {
+    // 1 syllable: 150 + 600 + 700 (demo) + 1500 (echo) + 2500 (feedback) = 5450 ms.
+    expect(tryMs(1, cfg, NORMAL_PACE)).toBe(
+      cfg.demoLeadInMs + cfg.syllableIntervalMs + cfg.postDemoPauseMs + 1500 + cfg.feedbackMs,
+    );
+  });
+
+  it('estimates the full session at a normal pace, first-try pace and worst case', () => {
+    const normal = minutes(estimateSessionMs(full, cfg, NORMAL_PACE).totalMs);
+    const fast = minutes(estimateSessionMs(full, cfg, FIRST_TRY_PACE).totalMs);
+    const worst = minutes(
+      estimateSessionMs(full, cfg, {
+        ...NORMAL_PACE,
+        averageTries: { 1: 3, 2: 3, 3: 3 },
+        answerShare: { 1: 1, 2: 1, 3: 1 },
+      }).totalMs,
+    );
+    console.log(
+      `[estimate] normal ${normal.toFixed(2)} min, first-try ${fast.toFixed(2)} min, worst ${worst.toFixed(2)} min`,
+    );
+    expect(fast).toBeLessThan(normal);
+    expect(normal).toBeGreaterThan(4.5);
+    // Even if every phrase needs all three tries, the session stays inside the 10-minute limit.
+    expect(worst).toBeLessThan(10);
   });
 });

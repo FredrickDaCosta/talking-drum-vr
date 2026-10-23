@@ -43,11 +43,14 @@ export interface DebugHudLessonProbe {
   lastResult: string;
   totalStars: number;
   maxStars: number;
+  /** LessonSystem.update() cost over the last second (average / max, ms; includes panel redraws). */
+  frameCostAvgMs: number;
+  frameCostMaxMs: number;
 }
 
-/** Debug-only lesson line: state, level, phrase id, attempt, last result, stars. */
+/** Debug-only lesson line: state, level, phrase id, attempt, last result, stars, frame cost. */
 export function formatLessonProbe(p: DebugHudLessonProbe): string {
-  return `lesson: ${p.phase} | level ${p.level} | phrase ${p.phraseId} | try ${p.attempt}/${p.maxTries} | last ${p.lastResult} | stars ${p.totalStars}/${p.maxStars}`;
+  return `lesson: ${p.phase} | level ${p.level} | phrase ${p.phraseId} | try ${p.attempt}/${p.maxTries} | last ${p.lastResult} | stars ${p.totalStars}/${p.maxStars} | cost avg ${fixed(p.frameCostAvgMs, 3)} / max ${fixed(p.frameCostMaxMs, 2)} ms (1 s)`;
 }
 
 export const AUDIO_PROBE_LABEL = 'software + audio buffer estimate';

@@ -1,4 +1,4 @@
-import type { PitchBand } from '../app/config.js';
+import { APP_CONFIG, type LessonPanelConfig, type PitchBand } from '../app/config.js';
 import type { LessonView, SyllableMark } from '../game/lesson-view.js';
 
 /**
@@ -31,6 +31,7 @@ const STATUS_COLOURS: Record<string, string> = {
   'Try again': '#f0b429',
   'Not this time': '#f85149',
   'Your turn': '#58a6ff',
+  'Strike the drum to begin.': '#f0b429',
 };
 
 function font(weight: 400 | 700, sizePx: number): string {
@@ -172,12 +173,13 @@ function drawStars(
   ctx.fillText(`${earned} / ${max}`, cx - r * 0.9, cy + 2);
 }
 
-/** Draws the whole panel. Called only when the view changes. */
+/** Draws the whole panel. Called only when the view changes. Text sizes come from config. */
 export function drawLessonPanel(
   ctx: CanvasRenderingContext2D,
   view: LessonView,
   width: number,
   height: number,
+  textPx: LessonPanelConfig['textPx'] = APP_CONFIG.lessonPanel.textPx,
 ): void {
   ctx.clearRect(0, 0, width, height);
   roundRect(ctx, 4, 4, width - 8, height - 8, 28);
@@ -193,8 +195,8 @@ export function drawLessonPanel(
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#9fb3c8';
-  fitFont(ctx, view.header, 400, 28, inner - 160);
-  ctx.fillText(view.header, 40, 50);
+  fitFont(ctx, view.header, 400, textPx.header, inner - 160);
+  ctx.fillText(view.header, 40, 52);
 
   const hasPhrase = view.tones.length > 0;
   const isDrill = hasPhrase && view.word.length === 0;
@@ -203,7 +205,7 @@ export function drawLessonPanel(
     if (hasPhrase) {
       drawStars(ctx, view.stars.earned, view.stars.max, width - 110, 40, 20);
     } else {
-      drawStars(ctx, view.stars.earned, view.stars.max, cx, 250, 46);
+      drawStars(ctx, view.stars.earned, view.stars.max, cx, 190, 46);
     }
   }
 
@@ -215,7 +217,7 @@ export function drawLessonPanel(
     if (!isDrill) {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      fitFont(ctx, view.word, 700, 96, inner);
+      fitFont(ctx, view.word, 700, textPx.word, inner);
       ctx.fillText(view.word, cx, 150);
     }
 
@@ -239,7 +241,7 @@ export function drawLessonPanel(
       if (!isDrill) {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#e6edf3';
-        fitFont(ctx, view.syllables[i] ?? '', 400, 40, column - 16);
+        fitFont(ctx, view.syllables[i] ?? '', 400, textPx.syllable, column - 16);
         ctx.fillText(view.syllables[i] ?? '', x, sylY);
       }
       drawToneArrow(ctx, view.tones[i], x, arrowY, arrowSize);
@@ -251,19 +253,38 @@ export function drawLessonPanel(
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#c9d1d9';
-    fitFont(ctx, view.gloss, 400, 32, inner);
+    fitFont(ctx, view.gloss, 400, textPx.gloss, inner);
     ctx.fillText(view.gloss, cx, isDrill ? 310 : 372);
   }
 
   ctx.textAlign = 'center';
+  let statusY: number;
+  let detailY: number;
+  if (hasPhrase) {
+    statusY = 432;
+    detailY = 482;
+  } else if (view.instructions.length > 0) {
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < view.instructions.length; i += 1) {
+      fitFont(ctx, view.instructions[i], 400, textPx.instruction, inner);
+      ctx.fillText(view.instructions[i], cx, 140 + i * (textPx.instruction + 22));
+    }
+    statusY = 340;
+    detailY = 420;
+  } else if (view.stars !== null) {
+    statusY = 330;
+    detailY = 410;
+  } else {
+    statusY = 250;
+    detailY = 330;
+  }
   ctx.fillStyle = STATUS_COLOURS[view.status] ?? '#e6edf3';
-  const statusY = hasPhrase ? 432 : view.stars !== null ? 360 : 230;
-  fitFont(ctx, view.status, 700, hasPhrase ? 50 : 60, inner);
+  fitFont(ctx, view.status, 700, hasPhrase ? textPx.status : textPx.bigStatus, inner);
   ctx.fillText(view.status, cx, statusY);
 
   ctx.fillStyle = '#9fb3c8';
-  fitFont(ctx, view.detail, 400, 28, inner);
-  ctx.fillText(view.detail, cx, hasPhrase ? 482 : statusY + 60);
+  fitFont(ctx, view.detail, 400, textPx.detail, inner);
+  ctx.fillText(view.detail, cx, detailY);
 }
 
 /** Debug only: draws text lines (e.g. diacritic specimens) with the lesson font. */

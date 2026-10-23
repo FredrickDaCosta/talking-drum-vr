@@ -14,6 +14,12 @@ import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
 import { statusChannel } from './ui/status-channel.js';
 
+declare global {
+  interface Window {
+    __talkingDrumUi?: { welcomePanelVisible: boolean };
+  }
+}
+
 export class PanelSystem extends createSystem({
   drums: { required: [TalkingDrum] },
 }) {
@@ -29,6 +35,8 @@ export class PanelSystem extends createSystem({
   private noticeMessage: string | null = null;
   private renderedMessage: string | null = null;
   private seenChannelVersion = -1;
+  /** For tests: whether the welcome panel is shown (it is hidden for the whole XR session). */
+  private readonly uiDiag = { welcomePanelVisible: true };
 
   init(): void {
     const flags = getAppFlags();
@@ -44,6 +52,20 @@ export class PanelSystem extends createSystem({
     const xrButton = panel?.getElementById('xr-button');
     const exitButton = panel?.getElementById('exit-button');
     const panelStatusEl = panel?.getElementById<UIKit.Text>('vr-status');
+    const panelObjects = [panel, this.world.getSceneEntity('welcome-panel')?.object3D];
+    if (typeof window !== 'undefined') {
+      window.__talkingDrumUi = this.uiDiag;
+    }
+    // In XR the lesson panel (LessonSystem) is the only panel: the welcome panel would sit behind
+    // it, so it is hidden (and its buttons disabled) for the whole session and shown again in 2D.
+    const setWelcomePanelShown = (shown: boolean): void => {
+      for (const obj of panelObjects) {
+        if (obj != null) {
+          obj.visible = shown;
+        }
+      }
+      this.uiDiag.welcomePanelVisible = shown;
+    };
 
     const updateStatusMessage = (message: string | null): void => {
       const hasMessage = message != null && message.length > 0;
@@ -117,11 +139,14 @@ export class PanelSystem extends createSystem({
         }
         this.inputNoticeState = 'pending';
         this.noticeMessage = null;
+        statusChannel.setInputNotice(null);
         this.renderedMessage = null;
         if (xrButton != null && exitButton != null && this.world.xrEnabled) {
           xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
-          exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
+          // Exit is via the headset's system menu (or the 2D page button); no hidden hit target.
+          exitButton.setProperties({ display: 'none' });
         }
+        setWelcomePanelShown(is2D);
         if (domEnterBtn !== null) {
           domEnterBtn.textContent = is2D ? 'Enter VR' : 'Exit VR';
           domEnterBtn.setAttribute('aria-label', is2D ? 'Enter VR (Hand Tracking)' : 'Exit VR');
@@ -185,6 +210,7 @@ export class PanelSystem extends createSystem({
     }
     this.inputNoticeState = next;
     this.noticeMessage = xrInputNoticeMessage(next);
+    statusChannel.setInputNotice(this.noticeMessage);
     this.renderStatus();
   }
 
