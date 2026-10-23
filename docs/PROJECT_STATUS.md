@@ -7,9 +7,9 @@
 
 ## Current Stage
 
-**Phase 2, step P2c (polish, onboarding, length, Quest test plan): IN REVIEW** on branch
-`feat/p2c-polish`. The PR is open; do NOT merge until the CTO approves. P2b was ACCEPTED and merged in #26
-(`ac4a7e1`), then deployed (Deploy run 40021633797, live smoke 10 passed). P2a merged in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+**Phase 2, step P2d (in-VR debug panel): IN REVIEW** on branch `feat/p2d-debug-panel`. The PR is open; do
+NOT merge until the CTO approves. P2c was ACCEPTED and merged in #27 (`5831a6c`), then deployed (Deploy run
+40026236236, live smoke 14 passed). P2b merged in #26 (`ac4a7e1`), P2a in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
 diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
 `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
 CTO/PM writes the task prompts and Fredrick relays them.
@@ -108,11 +108,16 @@ CTO/PM writes the task prompts and Fredrick relays them.
 - [ ] Fredrick: P2b emulator checklist (`docs/TEST_PLAN.md §3.4`) after deploy.
 - [x] Fredrick reviewed all 16 L2/L3 entries (2026-10-23): all marked `verified`.
 - [ ] Second native-speaker review of the L2/L3 content.
-- [x] P2c in review (`feat/p2c-polish`): title screen and welcome-panel hiding, full-length session plan,
+- [x] P2c merged (#27, `5831a6c`) and deployed: title screen and welcome-panel hiding, full-length session plan,
       END screen and restart, procedural feedback cues, robustness, a HUD frame-cost reading, and
       `docs/QUEST_TEST_PLAN.md`. See `docs/PHASE2_PLAN.md §5`.
 - [ ] Session length: ≈5.3 min at a normal pace (a model; UNVERIFIED). About 6 more L2 words or 5 more L3
       phrases from Fredrick would reach 6–8 min.
+- [x] P2d in review (`feat/p2d-debug-panel`): in-VR debug panel (`?debug=1` only) with fingertip mark / hide
+      controls; Quest plan updated to read it in VR; `phrasesPerLevel: 'all'`; `docs/CONTENT_ADDITIONS.md`.
+- [ ] Fredrick: send +4 L2 and +3 L3 entries (template in `docs/CONTENT_ADDITIONS.md`) to reach ≈6.9 min.
+- [ ] CTO decision: the all-misses worst case with that content is ≈12.7 min (> 10 min). Lower `maxTries` for
+      L3 or add a session time cap?
 - [ ] Fredrick: run `docs/QUEST_TEST_PLAN.md` on a borrowed Quest and send back the results table.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 

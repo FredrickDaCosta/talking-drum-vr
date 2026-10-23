@@ -1,7 +1,7 @@
 # Phase 2 Plan: "Listen, then echo" (`docs/PHASE2_PLAN.md`)
 
-> **Status:** P2a merged and deployed (#25). P2b merged and deployed (#26). P2c (polish, onboarding,
-> length, Quest test plan) in review.
+> **Status:** P2a (#25), P2b (#26) and P2c (#27) are merged and deployed. P2d (in-VR debug panel for the
+> Quest session) is in review.
 > Source: CTO design brief, 2026-10-23.
 
 ## 1. Game
@@ -328,3 +328,80 @@ numbers to write down, the config keys to tune, a one-page results table, and ho
   - title and panel legibility when seated
   - the Quest Browser's visibility events when the system menu opens
   - the per-frame cost on the device
+
+## 6. P2d design (in-VR debug panel)
+
+### 6.1 Why
+
+The debug HUD and the FPS overlay are on the flat page, so nobody can read them with the headset on. The
+borrowed-Quest session needs the key numbers inside VR.
+
+### 6.2 Panel (`src/debug/vr-debug-panel-system.ts`)
+
+- **Only with `?debug=1`:** `index.ts` registers `VrDebugPanelSystem` only when the flag is set, so without it
+  the panel, its listeners and its window hooks do not exist (e2e).
+- **Placement:** set by `APP_CONFIG.debugPanel` (`offsetMeters`, `widthMeters`, `heightMeters`,
+  `visibleAtStart`).
+  - It sits low and right of the drum, at drum offset `[0.30, 0.04, 0.16]`, 0.24 × 0.18 m, and is turned to
+    face the head every frame.
+  - The left side is avoided because the pitch ladder and the squeezing hand are there.
+- **Clearances** (unit-tested): farthest point 0.57 m from the default eye (≤ 0.61 m); 10 cm clear of the
+  drum body, 16 cm clear of the lesson panel, 34 cm clear of the ladder.
+  - Facing error in IWER: 0.000001° (e2e asserts < 2°).
+- **Content:** label and value columns in the vendored Noto subset, plain ASCII. Refreshed at
+  `debugPanel.refreshHz` (4 Hz).
+  - FPS, frame avg / max (5 s), max frame gap (5 s)
+  - strikes, last speed and radial distance
+  - pipeline ms with audio base / out latency
+  - R / L tracking, squeeze, band, pitch ratio
+  - calibration with open / fist values
+  - audio state and skip counts
+  - lesson step, level and phrase id
+  - marks
+- **Allocation:**
+  - Every frame, samples go into a preallocated snapshot and the frame times into a typed-array ring
+    (`FrameStatsWindow`); fingertip poses are read with `XRFrame.fillPoses` into a preallocated buffer.
+  - Strings are built only at 4 Hz.
+
+### 6.3 Hands-only controls (`src/debug/panel-touch.ts`)
+
+- **Touch:** an index fingertip inside the panel outline and within `touchDepthMeters` (3 cm) of its plane.
+  - It is edge-triggered: one event per entry.
+  - It re-arms only after the finger has been out for `touchRearmMs` (600 ms), so a resting finger or edge
+    jitter cannot repeat it.
+- **RIGHT index touch = mark:** a timestamped note in a ring buffer (`MarkLog`, `markCapacity` 32). It
+  records the time since load, the strike count, the last strike speed and radial distance, the lesson step
+  and the phrase id.
+  - The panel shows the count and the newest two.
+  - `window.__talkingDrumDebugPanel.marks()` returns them for later correlation.
+- **LEFT index touch = hide / show.** A thin outline stays visible.
+  - The left hand has to reach across the body to the right-side panel, so an accidental toggle is unlikely.
+- **Keyboard** (desktop and emulator): `debugPanel.toggleKey` (Backquote) and `markKey` (M).
+- **Is the mark overkill?** No, I kept it. It is about 90 lines (ring buffer, touch edge, one line of text).
+  Without it, "that hit felt wrong" cannot be tied to the strike count and time afterwards.
+  - The lightest alternative would be a bare counter with no context.
+
+### 6.4 Content additions (prepared, not added)
+
+- **No code change needed:** `lesson.phrasesPerLevel` is now `'all'` per level, so new entries in
+  `src/content/lessons.ts` play with no code or config change.
+- **What's needed:** see `docs/CONTENT_ADDITIONS.md` for the entry template, empty slots and the counts.
+  - 6 min needs +4 two-syllable L2 words or +3 three-syllable L3 phrases.
+  - +4 L2 and +3 L3 gives ≈6.9 min.
+  - With that content the all-misses worst case is ≈12.7 min, over the 10-minute limit; this is flagged in
+    that file.
+
+### 6.5 Verification limits (P2d)
+
+- **Verified in IWER e2e:**
+  - the panel is absent without `?debug=1`
+  - with it: it refreshes at ~4 Hz, shows both hands TRACKED, audio running and the lesson step, and the
+    strike count follows a scripted strike
+  - a right fingertip touch adds one mark, a left touch hides the panel, and the keyboard shortcuts work
+  - zero console errors
+- **UNVERIFIED (Quest only):**
+  - legibility of the 38 px text (~6.7 mm) at ~0.55 m
+  - whether the low-right position is comfortable to glance at
+  - fingertip touch reliability with real hand tracking (in IWER the fingertip is placed exactly)
+  - Quest Browser `XRFrame.fillPoses` support for the touch check: if it is missing, touches do nothing but
+    the panel still displays

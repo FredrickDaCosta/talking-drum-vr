@@ -114,7 +114,10 @@ export function buildSessionPlan(
   for (const level of [1, 2, 3] as const) {
     const phrases = entries
       .filter((e) => e.level === level)
-      .slice(0, config.phrasesPerLevel[level]);
+      .slice(
+        0,
+        config.phrasesPerLevel[level] === 'all' ? undefined : config.phrasesPerLevel[level],
+      );
     if (phrases.length > 0) {
       levels.push({ level, phrases });
     }

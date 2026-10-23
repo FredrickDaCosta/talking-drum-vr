@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Phase 2, step P2d (in-VR debug panel, `?debug=1` only):**
+  - A panel low and right of the drum, facing the player. It shows FPS and frame times, frame gap, strikes,
+    pipeline and audio latency, hand states, squeeze, band, pitch, calibration, audio skips, lesson step and
+    marks, refreshed at 4 Hz.
+  - Touch it with the RIGHT index finger to add a timestamped mark (ring buffer). Touch it with the LEFT index
+    finger to hide or show it. Keyboard: Backquote toggles, M marks.
+  - `lesson.phrasesPerLevel: 'all'`, so new content entries play without code changes.
+  - `docs/CONTENT_ADDITIONS.md`.
+  - `docs/QUEST_TEST_PLAN.md` now reads the panel in VR.
 - **Phase 2, step P2c (polish, onboarding, length, Quest test plan):**
   - **Title screen:** it states both controls and "Strike the drum to begin". The welcome panel is hidden for
     the whole XR session, and the hands-required notice moved to the lesson panel.

@@ -193,8 +193,8 @@ export interface LessonConfig {
   readonly levelIntroMs: number;
   /** How long the level result stays up (milliseconds). */
   readonly levelCompleteMs: number;
-  /** Phrases played per level (taken in data-file order). */
-  readonly phrasesPerLevel: Readonly<Record<1 | 2 | 3, number>>;
+  /** Phrases played per level (taken in data-file order); 'all' = every entry of that level. */
+  readonly phrasesPerLevel: Readonly<Record<1 | 2 | 3, number | 'all'>>;
   /** content:validate fails if a level has fewer entries than this. */
   readonly minEntriesPerLevel: Readonly<Record<1 | 2 | 3, number>>;
 }
@@ -223,6 +223,30 @@ export interface LessonPanelConfig {
   };
 }
 
+export interface DebugPanelConfig {
+  /** Shown at start (only ever built with ?debug=1). Toggled in VR by a left-index touch. */
+  readonly visibleAtStart: boolean;
+  /** Panel centre offset from the drum origin in world axes (meters): low and right of the drum. */
+  readonly offsetMeters: readonly [number, number, number];
+  readonly widthMeters: number;
+  readonly heightMeters: number;
+  readonly canvasWidthPx: number;
+  readonly canvasHeightPx: number;
+  /** Text size in canvas px (1 px = heightMeters / canvasHeightPx). */
+  readonly textPx: number;
+  /** Panel text refresh rate (Hz); values are sampled into preallocated fields between refreshes. */
+  readonly refreshHz: number;
+  /** A fingertip within this distance of the panel plane (and inside its outline) is a touch (m). */
+  readonly touchDepthMeters: number;
+  /** After a touch, the same hand must leave the panel and wait this long before it touches again (ms). */
+  readonly touchRearmMs: number;
+  /** Marks kept in the ring buffer (oldest overwritten). */
+  readonly markCapacity: number;
+  /** Debug keyboard shortcuts (KeyboardEvent.code). */
+  readonly toggleKey: string;
+  readonly markKey: string;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -246,6 +270,7 @@ export interface AppConfig {
   readonly pitchLadder: PitchLadderConfig;
   readonly lesson: LessonConfig;
   readonly lessonPanel: LessonPanelConfig;
+  readonly debugPanel: DebugPanelConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -360,7 +385,8 @@ export const APP_CONFIG: AppConfig = {
     feedbackMs: 2500,
     levelIntroMs: 3500,
     levelCompleteMs: 4000,
-    phrasesPerLevel: { 1: 8, 2: 12, 3: 4 },
+    // 'all' plays every entry of that level in data-file order, so new entries need no code change.
+    phrasesPerLevel: { 1: 'all', 2: 'all', 3: 'all' },
     minEntriesPerLevel: { 1: 8, 2: 12, 3: 4 },
   },
   lessonPanel: {
@@ -379,6 +405,21 @@ export const APP_CONFIG: AppConfig = {
       detail: 30,
       instruction: 40,
     },
+  },
+  debugPanel: {
+    visibleAtStart: true,
+    offsetMeters: [0.3, 0.04, 0.16],
+    widthMeters: 0.24,
+    heightMeters: 0.18,
+    canvasWidthPx: 1024,
+    canvasHeightPx: 768,
+    textPx: 38,
+    refreshHz: 4,
+    touchDepthMeters: 0.03,
+    touchRearmMs: 600,
+    markCapacity: 32,
+    toggleKey: 'Backquote',
+    markKey: 'KeyM',
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

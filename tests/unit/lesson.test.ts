@@ -188,9 +188,9 @@ describe('buildSessionPlan', () => {
   it('takes the configured number of phrases per level in file order', () => {
     const { plan: full, levelIndex, phraseIndex } = buildSessionPlan(LESSONS, cfg);
     expect(full.levels.map((l) => [l.level, l.phrases.length])).toEqual([
-      [1, cfg.phrasesPerLevel[1]],
-      [2, cfg.phrasesPerLevel[2]],
-      [3, cfg.phrasesPerLevel[3]],
+      [1, 8],
+      [2, 12],
+      [3, 4],
     ]);
     expect([levelIndex, phraseIndex]).toEqual([0, 0]);
     expect(maxStars(full)).toBe(3 * (8 + 12 + 4));
@@ -573,5 +573,44 @@ describe('session length estimate (a model; UNVERIFIED until playtests)', () => 
     expect(normal).toBeGreaterThan(4.5);
     // Even if every phrase needs all three tries, the session stays inside the 10-minute limit.
     expect(worst).toBeLessThan(10);
+  });
+});
+
+describe('content additions (no code change needed)', () => {
+  const extra = (n: number, level: 2 | 3, syllables: number): LessonEntry[] =>
+    Array.from({ length: n }, (_, i) =>
+      entry(`new-${level}-${i}`, level, Array<PitchBand>(syllables).fill('M')),
+    );
+
+  it('accepts appended draft entries and plays them, with no code or config change', () => {
+    const added = [...LESSONS, ...extra(3, 2, 2), ...extra(2, 3, 3)];
+    const report = validateLessons(added, cfg.minEntriesPerLevel);
+    expect(report.errors).toEqual([]);
+    expect(report.draftIds).toHaveLength(5); // new entries start as draft; the build still passes
+    const { plan: grown } = buildSessionPlan(added, cfg);
+    expect(grown.levels.map((l) => l.phrases.length)).toEqual([8, 15, 6]);
+  });
+
+  it('reports how many entries reach 6 to 8 minutes at a normal pace', () => {
+    const minutesWith = (entries: LessonEntry[]) =>
+      estimateSessionMs(buildSessionPlan(entries, cfg).plan, cfg, NORMAL_PACE).totalMs / 60_000;
+    const needed = (level: 2 | 3, syllables: number, target: number) => {
+      let n = 0;
+      while (minutesWith([...LESSONS, ...extra(n, level, syllables)]) < target) {
+        n += 1;
+      }
+      return n;
+    };
+    const l2For6 = needed(2, 2, 6);
+    const l2For7 = needed(2, 2, 7);
+    const l3For6 = needed(3, 3, 6);
+    const l3For7 = needed(3, 3, 7);
+    const mix = minutesWith([...LESSONS, ...extra(4, 2, 2), ...extra(3, 3, 3)]);
+    console.log(
+      `[estimate] now ${minutesWith([...LESSONS]).toFixed(2)} min; 6 min needs +${l2For6} two-syllable L2 or +${l3For6} three-syllable L3; 7 min needs +${l2For7} L2 or +${l3For7} L3; +4 L2 and +3 L3 gives ${mix.toFixed(2)} min`,
+    );
+    expect(l2For6).toBeGreaterThan(0);
+    expect(mix).toBeGreaterThan(6);
+    expect(mix).toBeLessThan(8);
   });
 });
