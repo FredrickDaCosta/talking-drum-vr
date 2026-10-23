@@ -7,9 +7,9 @@
 
 ## Current Stage
 
-**Stage M1c: IN REVIEW** on branch `feat/m1c-drum-audio`. The PR is open; do NOT merge until the CTO
-approves in writing. Implementation was handed from Antigravity to Claude Code (cloud session); the CTO/PM
-writes the task prompts.
+**M1 CLOSED** (tag `m1`, 2026-10-23). **Next stage: Phase 2, waiting for the CTO's design brief. Do not
+start Phase 2 work before it arrives.** Implementation was handed from Antigravity to Claude Code (cloud
+session); the CTO/PM writes the task prompts. Fredrick relays them.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
@@ -18,9 +18,11 @@ writes the task prompts.
   hand mode via the toolbar input-mode icon, `TRACKED`, 21 strikes, slow passes ignored, no red errors.
   Rim-miss was not observed by hand. Real-Quest feel, thresholds and latency are UNVERIFIED.
 - **Security triage:** Closed. Fixes merged and deployed in #14 (`754ab59`), #15 (`94efaf2`) and #16 (`d26bc0b`).
-  `npm audit`: 0 vulnerabilities. See `docs/SECURITY_TRIAGE.md` §7.
-- **M1c:** Implemented on `feat/m1c-drum-audio` and awaiting CTO review. After approval: merge, deploy,
-  live smoke, then M1 close (tag `m1`, not `v*`).
+  `npm audit`: 0 vulnerabilities. Follow-up #22 (`a72b74b`) ignores eslint/@eslint/js/typescript majors, and
+  #17–#19 are closed unmerged. See `docs/SECURITY_TRIAGE.md` §7–§8.
+- **M1c:** CTO ACCEPTED and merged in PR #21 (`3ae807c`). Deployed (Deploy run 39961741328, live smoke 5/5).
+  Flake closure: the IWER hand-strike test passed 30/30 consecutively with retries off (CI keeps `retries: 1`).
+- **M1:** Closed with the annotated tag `m1` and a CHANGELOG `[m1]` entry.
 
 ---
 
@@ -57,7 +59,7 @@ writes the task prompts.
 
 ## Open Tasks
 
-### M1c (`feat/m1c-drum-audio`, in review)
+### M1c (merged in PR #21 `3ae807c`; done)
 
 - [x] `DrumAudio` (`src/audio/drum-audio.ts`): one lazy `AudioContext`, unlocked in the Enter VR click and on
       the first page gesture (`src/audio/audio-unlock.ts`). The procedural _gángan_ placeholder is rendered via
@@ -78,8 +80,7 @@ writes the task prompts.
 - [x] ASSET_REGISTER entry for the procedural placeholder.
 - [x] E2E hand-strike flake root-caused: headless SwiftShader frames of 180–200 ms make the scripted strike
       slower than 0.30 m/s. The test now retries only measured slow-frame attempts.
-- [ ] Fredrick: M1c audio checklist (`docs/TEST_PLAN.md §3.2`) after deploy.
-- [ ] M1 close (after CTO approval, merge, deploy and live smoke): tag `m1`, CHANGELOG release entry.
+- [x] M1 close: tag `m1` and the CHANGELOG `[m1]` release entry.
 - Real-Quest audio latency, loudness feel and HRTF placement: **UNVERIFIED**.
 
 ### Dependabot / security (see `docs/SECURITY_TRIAGE.md` §7)
@@ -91,6 +92,20 @@ writes the task prompts.
       Close them, or add ignore rules? Do not merge without approval.
 - Note: Dependabot does not check the aliased `three` (`npm:super-three`), so three updates are manual.
 - E2E flake: root-caused and handled in M1c (see the M1c section above).
+
+### Open Items After M1 (owner in brackets)
+
+- [ ] [Fredrick] Emulator audio check: the M1c checklist in `docs/TEST_PLAN.md §3.2` on the live site.
+- [ ] [Fredrick] Real-Quest session covering every UNVERIFIED item: hand-tracking feel, strike thresholds,
+      palm vs fingertip, seated reach at 0.50 m, audible quality and loudness curve, HRTF placement,
+      audio and end-to-end latency, AudioContext state at the first strike in Quest Browser, 72/90 FPS thermals.
+- [ ] [Fredrick] Record his own drum sample to replace the procedural placeholder
+      (`DrumAudio.setBuffer()` / `decodeSample()`), and update `docs/ASSET_REGISTER.md`.
+- [ ] [Fredrick / native speaker] Native-speaker review of all Yoruba content (tones, words, diacritics)
+      before submission.
+- [ ] [Fredrick] Eligibility email to Meta for the VR Start Developer Competition 2026.
+- [ ] [Fredrick] Read the GitHub Security tab for the real Dependabot alert count (the API returns 403 to the agent).
+- [ ] [CTO] Phase 2 design brief.
 
 ### Physical Meta Quest Verification (Post-M1)
 
