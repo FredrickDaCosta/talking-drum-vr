@@ -168,3 +168,12 @@ rules also block security updates. Every rule in the config therefore names one 
 **Known flake (not caused by these changes):** the IWER hand-strike e2e test
 (`smoke.spec.ts:213`) failed once locally (`strike count` 0, expected 1) and passed on retry. It
 passed in all later local runs and in every CI and live-smoke run. dist was byte-identical at the time.
+
+## 8. Follow-up (2026-10-23, CTO decision)
+
+- Added `version-update:semver-major` ignore rules for `eslint`, `@eslint/js` and `typescript`. Each rule
+  names one package (no wildcards), so security updates are unaffected.
+- Closed Dependabot #17 (`@eslint/js` 10), #18 (`typescript` 7) and #19 (`eslint` 10) unmerged.
+- **`three` alias policy:** `three` is installed as `npm:super-three@0.181.0`, and Dependabot does not check
+  it at all (§7). The `three` / `super-three` / `@types/three` ignore entries are therefore inert. Three
+  upgrades are a manual task that needs CTO approval, and `@types/three` must move with them.
