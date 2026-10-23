@@ -3,6 +3,7 @@ import { APP_CONFIG, type Handedness } from '../app/config.js';
 import { getAppFlags } from '../app/flags.js';
 import { TalkingDrum } from '../app/talking-drum-component.js';
 import { DebugHud, type DebugHudTelemetry } from '../debug/debug-hud.js';
+import { frameTiming } from '../debug/frame-timing.js';
 import { HandTracker, type HandTrackingQuality } from '../input/hand-tracker.js';
 import {
   composeReferenceSpaceToDrumLocal,
@@ -159,6 +160,7 @@ export class StrikeSystem extends createSystem({
   private lastStrikeRadialMeters = 0;
   private wasImmersive = false;
   private frameEntryPerfNowMs = 0;
+  private debugEnabled = false;
 
   init(): void {
     const flags = getAppFlags();
@@ -172,6 +174,7 @@ export class StrikeSystem extends createSystem({
       window.__talkingDrumRuntime = this.diagnostics;
     }
 
+    this.debugEnabled = flags.debug;
     if (flags.debug) {
       this.debugHud = new DebugHud();
       this.debugHud.mount();
@@ -331,6 +334,9 @@ export class StrikeSystem extends createSystem({
 
   update(_delta: number, time: number): void {
     this.frameEntryPerfNowMs = performance.now();
+    if (this.debugEnabled) {
+      frameTiming.recordFrameEntry(this.frameEntryPerfNowMs);
+    }
     const frameTimestampMs = time * 1000;
     let drumObj = null;
     for (const entity of this.queries.drums.entities) {

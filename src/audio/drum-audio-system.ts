@@ -1,8 +1,10 @@
-import { createSystem, Quaternion, Vector3 } from '@iwsdk/core';
+import { createSystem, Quaternion, Vector3, VisibilityState } from '@iwsdk/core';
 import { APP_CONFIG } from '../app/config.js';
 import { getAppFlags } from '../app/flags.js';
 import { TalkingDrum } from '../app/talking-drum-component.js';
-import { DebugHud } from '../debug/debug-hud.js';
+import { DebugHud, type DebugHudAudioProbe } from '../debug/debug-hud.js';
+import { DEBUG_MAX_WINDOW_MS, frameTiming } from '../debug/frame-timing.js';
+import { RollingMaxWindow } from '../debug/rolling-max.js';
 import { StrikeSystem } from '../game/strike-system.js';
 import { drumAudio } from './audio-unlock.js';
 import type { DrumAudioDiagnostics } from './drum-audio.js';
@@ -29,6 +31,18 @@ export class DrumAudioSystem extends createSystem({
   private readonly scratch = new Vector3();
   private debugEnabled = false;
   private lastHudRefreshMs = -Infinity;
+  private readonly pipelineWindow = new RollingMaxWindow(DEBUG_MAX_WINDOW_MS, 128);
+  private readonly probe: DebugHudAudioProbe = {
+    contextState: 'no-context',
+    voicesStartedCount: 0,
+    activeVoices: 0,
+    lastSoftwarePipelineMs: Number.NaN,
+    maxPipelineMs5s: Number.NaN,
+    maxFrameGapMs5s: Number.NaN,
+    baseLatencyMs: Number.NaN,
+    outputLatencyMs: Number.NaN,
+    skipped: drumAudio.diagnostics.skipped,
+  };
 
   init(): void {
     this.debugEnabled = getAppFlags().debug;
@@ -38,21 +52,53 @@ export class DrumAudioSystem extends createSystem({
     void drumAudio.prepare();
 
     const unsubscribe = StrikeSystem.onStrike((event) => {
-      drumAudio.play({ velocity: event.hit.speed }, event.frameEntryPerfNowMs);
+      const outcome = drumAudio.play({ velocity: event.hit.speed }, event.frameEntryPerfNowMs);
       if (this.debugEnabled) {
-        DebugHud.active?.updateAudioProbe(drumAudio.diagnostics);
+        if (outcome === 'played') {
+          this.pipelineWindow.push(
+            event.frameEntryPerfNowMs,
+            drumAudio.diagnostics.lastSoftwarePipelineMs,
+          );
+        }
+        this.refreshHudProbe(performance.now());
       }
     });
-    this.cleanupFuncs.push(unsubscribe);
+    // XR session start/end (immersive <-> non-immersive) can leave the context suspended.
+    let previousVisibility = this.world.visibilityState.peek();
+    const unsubscribeVisibility = this.world.visibilityState.subscribe((state) => {
+      const sessionBoundary =
+        (state === VisibilityState.NonImmersive) !==
+        (previousVisibility === VisibilityState.NonImmersive);
+      previousVisibility = state;
+      if (sessionBoundary) {
+        drumAudio.requestResume('xr-session');
+      }
+    });
+    this.cleanupFuncs.push(unsubscribe, unsubscribeVisibility);
+  }
+
+  /** Debug HUD only: copies diagnostics into a pre-allocated probe (no per-frame allocation). */
+  private refreshHudProbe(nowMs: number): void {
+    this.lastHudRefreshMs = nowMs;
+    drumAudio.refreshContextDiagnostics();
+    const d = drumAudio.diagnostics;
+    const p = this.probe;
+    p.contextState = d.contextState;
+    p.voicesStartedCount = d.voicesStartedCount;
+    p.activeVoices = d.activeVoices;
+    p.lastSoftwarePipelineMs = d.lastSoftwarePipelineMs;
+    p.maxPipelineMs5s = this.pipelineWindow.max(nowMs);
+    p.maxFrameGapMs5s = frameTiming.maxFrameGapMs(nowMs);
+    p.baseLatencyMs = d.baseLatencyMs;
+    p.outputLatencyMs = d.outputLatencyMs;
+    DebugHud.active?.updateAudioProbe(p);
   }
 
   update(): void {
     if (this.debugEnabled) {
       const nowMs = performance.now();
       if (nowMs - this.lastHudRefreshMs >= HUD_PROBE_REFRESH_MS) {
-        this.lastHudRefreshMs = nowMs;
-        drumAudio.refreshContextDiagnostics();
-        DebugHud.active?.updateAudioProbe(drumAudio.diagnostics);
+        this.refreshHudProbe(nowMs);
       }
     }
 

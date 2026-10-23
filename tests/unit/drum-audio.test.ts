@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { APP_CONFIG } from '../../src/app/config.js';
 import {
   DrumAudio,
+  type DrumAudioDeps,
   normaliseStrikeSpeed,
   sanitisePitchRatio,
   strikeSpeedToGain,
@@ -26,6 +27,7 @@ function createMockContext(initialState: AudioContextState = 'running') {
   const param = (): MockParam => ({ value: 0 });
   const ctx = {
     state: initialState as AudioContextState,
+    currentTime: 0,
     baseLatency: 0.005 as number | undefined,
     outputLatency: undefined as number | undefined,
     destination: {},
@@ -79,13 +81,19 @@ function createMockBuffer(peak = 0.8) {
   return { duration: 0.65, getChannelData: () => data } as unknown as AudioBuffer;
 }
 
-function createReadyDrumAudio(state: AudioContextState = 'running', nowMs = 1000) {
+function createReadyDrumAudio(
+  state: AudioContextState = 'running',
+  nowMs = 1000,
+  extraDeps: Partial<DrumAudioDeps> = {},
+) {
   const mock = createMockContext(state);
   const audio = new DrumAudio(audioConfig, {
     createContext: () => mock.ctx as unknown as AudioContext,
     renderPlaceholder: () => Promise.resolve(createMockBuffer()),
     now: () => nowMs,
     warn: () => {},
+    hasUserActivation: () => true,
+    ...extraDeps,
   });
   return { audio, ...mock };
 }
@@ -279,5 +287,128 @@ describe('gángan placeholder noise source', () => {
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThan(1);
     }
+  });
+});
+
+describe('DrumAudio voice and skip diagnostics', () => {
+  it('counts active voices from the fixed per-voice end-time array (started stays cumulative)', async () => {
+    const { audio, ctx } = createReadyDrumAudio();
+    await audio.prepare();
+    audio.unlock();
+    ctx.currentTime = 10;
+    audio.play({ velocity: 1 });
+    ctx.currentTime = 10.3;
+    audio.play({ velocity: 1, pitchRatio: 2 }); // 0.65 s / 2 = ends at 10.625
+    audio.refreshContextDiagnostics();
+    expect(audio.diagnostics.voicesStartedCount).toBe(2);
+    expect(audio.diagnostics.activeVoices).toBe(2);
+    ctx.currentTime = 10.64; // first ends at 10.65, second ended at 10.625
+    audio.refreshContextDiagnostics();
+    expect(audio.diagnostics.activeVoices).toBe(1);
+    ctx.currentTime = 11;
+    audio.refreshContextDiagnostics();
+    expect(audio.diagnostics.activeVoices).toBe(0);
+    expect(audio.diagnostics.voicesStartedCount).toBe(2);
+  });
+
+  it('counts skips by reason', async () => {
+    const { audio, ctx } = createReadyDrumAudio('running');
+    audio.play({ velocity: 1 }); // no context yet
+    audio.unlock();
+    audio.play({ velocity: 1 }); // buffer not ready
+    await audio.prepare();
+    audio.play({ velocity: Number.NaN }); // invalid
+    ctx.state = 'suspended';
+    ctx.resume.mockImplementation(() => Promise.resolve());
+    audio.play({ velocity: 1 }); // not running
+    expect(audio.diagnostics.skipped).toEqual({
+      noContext: 1,
+      contextNotRunning: 1,
+      bufferNotReady: 1,
+      invalidVelocity: 1,
+    });
+    expect(audio.diagnostics.skippedCount).toBe(4);
+  });
+});
+
+describe('DrumAudio safe resume handler', () => {
+  it('does nothing without a context or while running', () => {
+    const { audio, ctx } = createReadyDrumAudio('running');
+    audio.requestResume('visibility');
+    audio.unlock();
+    audio.requestResume('visibility');
+    expect(ctx.resume).not.toHaveBeenCalled();
+    expect(audio.diagnostics.resumeRequests).toBe(0);
+  });
+
+  it('resumes a suspended or interrupted context only after a user gesture', () => {
+    let activated = false;
+    const { audio, ctx } = createReadyDrumAudio('running', 1000, {
+      hasUserActivation: () => activated,
+    });
+    audio.unlock();
+    ctx.state = 'suspended';
+    audio.requestResume('xr-session');
+    expect(ctx.resume).not.toHaveBeenCalled();
+    expect(audio.diagnostics.resumeDeferredNoGesture).toBe(1);
+
+    activated = true;
+    audio.requestResume('xr-session');
+    expect(ctx.resume).toHaveBeenCalledTimes(1);
+    expect(audio.diagnostics.lastResumeReason).toBe('xr-session');
+
+    ctx.state = 'interrupted' as AudioContextState;
+    audio.requestResume('visibility');
+    expect(ctx.resume).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to "unlock() was called" when navigator.userActivation is unavailable', () => {
+    const { audio, ctx } = createReadyDrumAudio('running', 1000, {
+      hasUserActivation: () => undefined,
+    });
+    audio.unlock();
+    ctx.state = 'suspended';
+    audio.requestResume('visibility');
+    expect(ctx.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a rejected resume() as a warning, never throws', async () => {
+    const warn = vi.fn();
+    const { audio, ctx } = createReadyDrumAudio('running', 1000, { warn });
+    audio.unlock();
+    ctx.state = 'suspended';
+    ctx.resume.mockImplementation(() => Promise.reject(new Error('blocked')));
+    expect(() => audio.requestResume('visibility')).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('(visibility)');
+  });
+
+  it('requests a resume on statechange to suspended', () => {
+    const { audio, ctx } = createReadyDrumAudio('running');
+    audio.unlock();
+    const handler = ctx.addEventListener.mock.calls.find((c) => c[0] === 'statechange')?.[1] as
+      (() => void) | undefined;
+    expect(handler).toBeTypeOf('function');
+    ctx.state = 'suspended';
+    handler?.();
+    expect(ctx.resume).toHaveBeenCalledTimes(1);
+    expect(audio.diagnostics.lastResumeReason).toBe('statechange');
+    expect(audio.diagnostics.contextState).toBe('suspended');
+  });
+
+  it('keeps a hit during a non-running context skipped and never plays it late', async () => {
+    const { audio, ctx, sources } = createReadyDrumAudio('running');
+    await audio.prepare();
+    audio.unlock();
+    ctx.state = 'suspended';
+    expect(audio.play({ velocity: 1 })).toBe('context-not-running');
+    expect(ctx.resume).toHaveBeenCalledTimes(1); // resume requested by the strike...
+    expect(ctx.state).toBe('running'); // ...and the mock resumed immediately,
+    await Promise.resolve();
+    expect(sources).toHaveLength(0); // but the skipped hit is never started afterwards.
+    expect(audio.play({ velocity: 1 })).toBe('played'); // the next hit plays normally
+    expect(sources).toHaveLength(1);
   });
 });

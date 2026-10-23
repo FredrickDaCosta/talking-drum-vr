@@ -167,6 +167,7 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     await expect(audioProbe).toContainText('software + audio buffer estimate');
     await expect(audioProbe).toContainText('not tracking / end-to-end latency');
     await expect(audioProbe).toContainText('pipeline n/a');
+    await expect(audioProbe).toContainText('voices started 0');
 
     const thirdPartyRequests = collectThirdPartyRequests(trackedRequests, response, page.url());
 
@@ -513,7 +514,14 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     expect(Number.isFinite(strikeResults.audioAfterFastStrike.lastSoftwarePipelineMs)).toBe(true);
     expect(strikeResults.audioAfterFastStrike.lastSoftwarePipelineMs).toBeGreaterThanOrEqual(0);
     expect(strikeResults.audioProbeTextAfterFastStrike).toMatch(/pipeline \d+\.\d{2} ms/);
-    expect(strikeResults.audioProbeTextAfterFastStrike).toContain('voices 1');
+    expect(strikeResults.audioProbeTextAfterFastStrike).toContain('voices started 1');
+    expect(strikeResults.audioProbeTextAfterFastStrike).toMatch(
+      /max pipeline \(5 s\) \d+\.\d{2} ms/,
+    );
+    expect(strikeResults.audioProbeTextAfterFastStrike).toMatch(/max frame gap \(5 s\) \d+\.\d ms/);
+    expect(strikeResults.audioProbeTextAfterFastStrike).toContain(
+      'skipped no-context 0 / not-running 0 / no-buffer 0 / invalid 0',
+    );
     expect(strikeResults.voicesAtEnd).toBe(1);
     // Hands are tracked, so the controller-only notice never appears.
     await expect(page.getByTestId('vr-status-message')).toBeHidden();

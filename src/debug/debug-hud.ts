@@ -12,10 +12,23 @@ export interface DebugHudTelemetry {
 
 export interface DebugHudAudioProbe {
   contextState: string;
+  /** Cumulative voices started since load. */
   voicesStartedCount: number;
+  /** Voices currently sounding. */
+  activeVoices: number;
   lastSoftwarePipelineMs: number;
+  /** Largest software-pipeline time in the last 5 s (NaN if no strike). */
+  maxPipelineMs5s: number;
+  /** Largest interval between StrikeSystem frame entries in the last 5 s. */
+  maxFrameGapMs5s: number;
   baseLatencyMs: number;
   outputLatencyMs: number;
+  skipped: {
+    noContext: number;
+    contextNotRunning: number;
+    bufferNotReady: number;
+    invalidVelocity: number;
+  };
 }
 
 export const AUDIO_PROBE_LABEL = 'software + audio buffer estimate';
@@ -26,11 +39,22 @@ function formatMs(ms: number, digits: number): string {
 
 /**
  * Debug-only latency line. `pipeline` is performance.now() at play() minus performance.now() at
- * StrikeSystem frame entry; `base`/`out` are AudioContext.baseLatency/outputLatency. None of these
- * measure hand-tracking or end-to-end motion-to-sound latency (Quest-only, UNVERIFIED).
+ * StrikeSystem frame entry; `max frame gap` is the longest interval between frame entries (strike
+ * detection is per frame, so a long frame delays detection); `base`/`out` are
+ * AudioContext.baseLatency/outputLatency. None of these measure hand-tracking or end-to-end
+ * motion-to-sound latency (Quest-only, UNVERIFIED).
  */
 export function formatAudioProbe(probe: DebugHudAudioProbe): string {
-  return `${AUDIO_PROBE_LABEL} (not tracking / end-to-end latency): pipeline ${formatMs(probe.lastSoftwarePipelineMs, 2)} | base ${formatMs(probe.baseLatencyMs, 1)} | out ${formatMs(probe.outputLatencyMs, 1)} | audio ${probe.contextState} | voices ${probe.voicesStartedCount}`;
+  const s = probe.skipped;
+  return (
+    `${AUDIO_PROBE_LABEL} (not tracking / end-to-end latency): ` +
+    `pipeline ${formatMs(probe.lastSoftwarePipelineMs, 2)} | ` +
+    `max pipeline (5 s) ${formatMs(probe.maxPipelineMs5s, 2)} | ` +
+    `max frame gap (5 s) ${formatMs(probe.maxFrameGapMs5s, 1)} | ` +
+    `base ${formatMs(probe.baseLatencyMs, 1)} | out ${formatMs(probe.outputLatencyMs, 1)} | ` +
+    `audio ${probe.contextState} | voices started ${probe.voicesStartedCount} | active ${probe.activeVoices} | ` +
+    `skipped no-context ${s.noContext} / not-running ${s.contextNotRunning} / no-buffer ${s.bufferNotReady} / invalid ${s.invalidVelocity}`
+  );
 }
 
 function formatSignedMeters(meters: number): string {

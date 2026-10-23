@@ -13,6 +13,17 @@ export type DrumAudioPlayOutcome =
 
 export type DrumAudioContextState = AudioContextState | 'no-context' | 'unsupported';
 
+/** Why a resume was requested (debug diagnostics only). */
+export type DrumAudioResumeReason = 'statechange' | 'visibility' | 'xr-session' | 'strike';
+
+/** Per-reason counts of play() calls that did not start a voice. */
+export interface DrumAudioSkipCounts {
+  noContext: number;
+  contextNotRunning: number;
+  bufferNotReady: number;
+  invalidVelocity: number;
+}
+
 export interface DrumAudioDiagnostics {
   contextState: DrumAudioContextState;
   /** AudioContext state observed by the first play() call (i.e. at the first strike). */
@@ -21,8 +32,16 @@ export interface DrumAudioDiagnostics {
   bufferDurationSec: number;
   bufferPeak: number;
   playCalls: number;
+  /** Cumulative number of voices started since load (not the number currently sounding). */
   voicesStartedCount: number;
+  /** Voices still sounding as of the last refreshContextDiagnostics() call. */
+  activeVoices: number;
   skippedCount: number;
+  skipped: DrumAudioSkipCounts;
+  /** resume() calls issued by requestResume(), and requests ignored because no gesture has happened yet. */
+  resumeRequests: number;
+  resumeDeferredNoGesture: number;
+  lastResumeReason: DrumAudioResumeReason | 'none';
   lastOutcome: DrumAudioPlayOutcome | 'none';
   lastGain: number;
   lastPlaybackRate: number;
@@ -70,6 +89,8 @@ export interface DrumAudioDeps {
   renderPlaceholder: (sampleRate: number) => Promise<AudioBuffer>;
   now: () => number;
   warn: (message: string, error?: unknown) => void;
+  /** True once the page has had a user activation (navigator.userActivation.hasBeenActive). */
+  hasUserActivation: () => boolean | undefined;
 }
 
 const defaultDeps: DrumAudioDeps = {
@@ -77,6 +98,8 @@ const defaultDeps: DrumAudioDeps = {
   renderPlaceholder: (sampleRate) => renderGanganPlaceholder(sampleRate),
   now: () => performance.now(),
   warn: (message, error) => console.warn(message, error),
+  hasUserActivation: () =>
+    typeof navigator === 'undefined' ? undefined : navigator.userActivation?.hasBeenActive,
 };
 
 /**
@@ -96,7 +119,12 @@ export class DrumAudio {
     bufferPeak: 0,
     playCalls: 0,
     voicesStartedCount: 0,
+    activeVoices: 0,
     skippedCount: 0,
+    skipped: { noContext: 0, contextNotRunning: 0, bufferNotReady: 0, invalidVelocity: 0 },
+    resumeRequests: 0,
+    resumeDeferredNoGesture: 0,
+    lastResumeReason: 'none',
     lastOutcome: 'none',
     lastGain: 0,
     lastPlaybackRate: 1,
@@ -111,12 +139,16 @@ export class DrumAudio {
   private buffer: AudioBuffer | null = null;
   private panner: PannerNode | null = null;
   private readonly voices: GainNode[] = [];
+  /** AudioContext time at which each pooled voice's current sound ends (fixed size, no per-hit allocation). */
+  private readonly voiceEndTimes: Float64Array;
   private nextVoice = 0;
+  private unlocked = false;
   private preparePromise: Promise<void> | null = null;
 
   constructor(config: DrumAudioConfig = APP_CONFIG.audio, deps: Partial<DrumAudioDeps> = {}) {
     this.config = config;
     this.deps = { ...defaultDeps, ...deps };
+    this.voiceEndTimes = new Float64Array(config.voicePoolSize);
   }
 
   get context(): AudioContext | null {
@@ -171,6 +203,7 @@ export class DrumAudio {
    * gesture handler (click / pointerdown / keydown) for the browser to allow playback.
    */
   unlock(): void {
+    this.unlocked = true;
     if (this.ctx === null) {
       try {
         this.ctx = this.deps.createContext();
@@ -188,6 +221,32 @@ export class DrumAudio {
       });
     }
     this.refreshContextDiagnostics();
+  }
+
+  /**
+   * Safe resume for a context the browser or OS suspended mid-session (state change, tab becoming
+   * visible again, XR session start/end, or a strike). Only issues resume() after the page has had
+   * a user gesture; failures are logged as warnings. It never plays anything: a hit that arrives
+   * while the context is not running stays skipped rather than being played late.
+   */
+  requestResume(reason: DrumAudioResumeReason): void {
+    const ctx = this.ctx;
+    if (ctx === null) {
+      return;
+    }
+    const state = ctx.state as string;
+    if (state !== 'suspended' && state !== 'interrupted') {
+      return;
+    }
+    if (!(this.deps.hasUserActivation() ?? this.unlocked)) {
+      this.diagnostics.resumeDeferredNoGesture += 1;
+      return;
+    }
+    this.diagnostics.resumeRequests += 1;
+    this.diagnostics.lastResumeReason = reason;
+    ctx.resume().catch((error: unknown) => {
+      this.deps.warn(`[DrumAudio] AudioContext.resume() (${reason}) was rejected.`, error);
+    });
   }
 
   setDrumPosition(x: number, y: number, z: number): void {
@@ -253,6 +312,15 @@ export class DrumAudio {
       d.voicesStartedCount += 1;
     } else {
       d.skippedCount += 1;
+      if (outcome === 'no-context') {
+        d.skipped.noContext += 1;
+      } else if (outcome === 'context-not-running') {
+        d.skipped.contextNotRunning += 1;
+      } else if (outcome === 'buffer-not-ready') {
+        d.skipped.bufferNotReady += 1;
+      } else {
+        d.skipped.invalidVelocity += 1;
+      }
     }
     return outcome;
   }
@@ -265,6 +333,14 @@ export class DrumAudio {
     this.diagnostics.contextState = ctx.state;
     this.diagnostics.baseLatencyMs = secondsToMs(ctx.baseLatency);
     this.diagnostics.outputLatencyMs = secondsToMs(ctx.outputLatency);
+    let active = 0;
+    const now = ctx.currentTime;
+    for (let i = 0; i < this.voiceEndTimes.length; i += 1) {
+      if (this.voiceEndTimes[i] > now) {
+        active += 1;
+      }
+    }
+    this.diagnostics.activeVoices = active;
   }
 
   private startVoice(
@@ -279,11 +355,7 @@ export class DrumAudio {
       return 'no-context';
     }
     if (ctx.state !== 'running') {
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {
-          // Without a gesture this is expected to fail; unlock() reports the real failure.
-        });
-      }
+      this.requestResume('strike');
       return 'context-not-running';
     }
     if (this.buffer === null) {
@@ -293,8 +365,9 @@ export class DrumAudio {
     const gain = strikeSpeedToGain(params.velocity, this.config);
     const playbackRate = sanitisePitchRatio(params.pitchRatio, this.config);
 
-    const voiceGain = this.voices[this.nextVoice];
-    this.nextVoice = (this.nextVoice + 1) % this.voices.length;
+    const voiceIndex = this.nextVoice;
+    const voiceGain = this.voices[voiceIndex];
+    this.nextVoice = (voiceIndex + 1) % this.voices.length;
     voiceGain.gain.value = gain;
 
     const source = ctx.createBufferSource();
@@ -304,6 +377,7 @@ export class DrumAudio {
 
     this.diagnostics.lastSoftwarePipelineMs = this.deps.now() - frameEntryPerfNowMs;
     source.start(0);
+    this.voiceEndTimes[voiceIndex] = ctx.currentTime + this.buffer.duration / playbackRate;
 
     this.diagnostics.lastGain = gain;
     this.diagnostics.lastPlaybackRate = playbackRate;
@@ -327,5 +401,6 @@ export class DrumAudio {
 
   private readonly onStateChange = (): void => {
     this.refreshContextDiagnostics();
+    this.requestResume('statechange');
   };
 }

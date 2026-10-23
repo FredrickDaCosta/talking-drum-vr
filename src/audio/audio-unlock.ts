@@ -33,3 +33,20 @@ export function installAudioUnlockListeners(
   }
   return remove;
 }
+
+/**
+ * Asks the context to resume when the tab becomes visible again (the browser or OS may have
+ * suspended it). `requestResume()` only acts after a user gesture and never plays a late sound.
+ */
+export function installAudioResumeOnVisible(
+  doc: Document,
+  audio: DrumAudio = drumAudio,
+): () => void {
+  const onVisibility = (): void => {
+    if (doc.visibilityState === 'visible') {
+      audio.requestResume('visibility');
+    }
+  };
+  doc.addEventListener('visibilitychange', onVisibility);
+  return () => doc.removeEventListener('visibilitychange', onVisibility);
+}
