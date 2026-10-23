@@ -92,6 +92,93 @@
         outline: 3px solid #7ee787;
         outline-offset: 2px;
       }
+      /* Desktop play mode (no headset): instructions, pitch buttons and key hint. */
+      #desktop-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(240, 180, 41, 0.6);
+        background: rgba(20, 18, 16, 0.92);
+        color: #fff8eb;
+        text-align: center;
+      }
+      #desktop-controls[hidden],
+      #play-without-headset[hidden] {
+        display: none;
+      }
+      .desktop-instructions {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.4;
+      }
+      .desktop-pitch {
+        display: flex;
+        gap: 10px;
+      }
+      .desktop-pitch button {
+        min-width: 76px;
+        min-height: 48px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        background: #2a2622;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .desktop-pitch button[data-band='L'][aria-pressed='true'] {
+        background: #4f8fd6;
+        border-color: #ffffff;
+      }
+      .desktop-pitch button[data-band='M'][aria-pressed='true'] {
+        background: #b7860f;
+        border-color: #ffffff;
+      }
+      .desktop-pitch button[data-band='H'][aria-pressed='true'] {
+        background: #c4490a;
+        border-color: #ffffff;
+      }
+      .desktop-pitch button:focus-visible,
+      #play-without-headset:focus-visible {
+        outline: 3px solid #7ee787;
+        outline-offset: 2px;
+      }
+      .desktop-hint {
+        margin: 0;
+        font-size: 13px;
+        color: #c9c1b4;
+      }
+      #play-without-headset {
+        min-height: 44px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: transparent;
+        color: #fff8eb;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      /* Without a headset, Enter VR stays available but steps back behind the desktop controls. */
+      body.desktop-mode #enter-vr-button {
+        min-height: 44px;
+        padding: 8px 16px;
+        background: transparent;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: none;
+      }
+      @media (max-width: 480px) {
+        #xr-hud-controls {
+          bottom: 12px;
+        }
+        .desktop-instructions {
+          font-size: 15px;
+        }
+      }
     </style>
   </head>
   <body>

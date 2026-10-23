@@ -250,8 +250,13 @@ export class VrDebugPanelSystem extends createSystem({
     this.hooks.centre.x = this.scratch.x;
     this.hooks.centre.y = this.scratch.y;
     this.hooks.centre.z = this.scratch.z;
-    this.player.head.updateWorldMatrix(true, false);
-    this.headPos.setFromMatrixPosition(this.player.head.matrixWorld);
+    // In XR the player's head; on a flat screen (desktop play) the 2D camera.
+    const viewer =
+      this.world.visibilityState.peek() === VisibilityState.NonImmersive
+        ? this.world.camera
+        : this.player.head;
+    viewer.updateWorldMatrix(true, false);
+    this.headPos.setFromMatrixPosition(viewer.matrixWorld);
     this.root.lookAt(this.headPos);
     this.hooks.head.x = this.headPos.x;
     this.hooks.head.y = this.headPos.y;

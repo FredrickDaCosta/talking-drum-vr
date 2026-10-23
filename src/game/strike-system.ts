@@ -102,6 +102,18 @@ export class StrikeSystem extends createSystem({
   drums: { required: [TalkingDrum] },
 }) {
   private static readonly strikeListeners: StrikeEventListener[] = [];
+  private static active: StrikeSystem | null = null;
+
+  /**
+   * A strike from another input (desktop mouse / keyboard / touch): counted and delivered to the
+   * same listeners (audio, lesson) as a hand strike. No-op before the system exists.
+   */
+  static emitExternalStrike(event: InternalStrikeEvent): void {
+    StrikeSystem.active?.deliverStrike(
+      event,
+      Math.hypot(event.hit.position.x, event.hit.position.z),
+    );
+  }
 
   static onStrike(listener: StrikeEventListener): () => void {
     StrikeSystem.strikeListeners.push(listener);
@@ -163,6 +175,12 @@ export class StrikeSystem extends createSystem({
   private debugEnabled = false;
 
   init(): void {
+    StrikeSystem.active = this;
+    this.cleanupFuncs.push(() => {
+      if (StrikeSystem.active === this) {
+        StrikeSystem.active = null;
+      }
+    });
     const flags = getAppFlags();
     this.primaryHand = flags.hand ?? APP_CONFIG.strike.primaryHand;
     this.secondaryHand = this.primaryHand === 'right' ? 'left' : 'right';
@@ -307,29 +325,39 @@ export class StrikeSystem extends createSystem({
     }
 
     const radialDistanceMeters = Math.hypot(hit.position.x, hit.position.z);
-    this.strikeCount += 1;
-    this.lastStrikeSpeedMps = hit.speed;
-    this.lastStrikeRadialMeters = radialDistanceMeters;
+    if (StrikeSystem.strikeListeners.length > 0) {
+      this.deliverStrike(
+        {
+          hit,
+          hand: handedness,
+          frameTimestampMs,
+          frameEntryPerfNowMs: this.frameEntryPerfNowMs,
+        },
+        radialDistanceMeters,
+      );
+    } else {
+      this.recordStrike(hit.speed, radialDistanceMeters, frameTimestampMs);
+    }
+    return true;
+  }
 
+  private recordStrike(speedMps: number, radialMeters: number, frameTimestampMs: number): void {
+    this.strikeCount += 1;
+    this.lastStrikeSpeedMps = speedMps;
+    this.lastStrikeRadialMeters = radialMeters;
     this.diagnostics.strikeCount = this.strikeCount;
     this.diagnostics.lastStrikeSpeedMps = this.lastStrikeSpeedMps;
     this.diagnostics.lastStrikeRadialMeters = this.lastStrikeRadialMeters;
     this.diagnostics.lastFrameTimestampMs = frameTimestampMs;
+  }
 
+  /** Counts a strike and hands it to every listener (hand strikes and desktop strikes alike). */
+  private deliverStrike(event: InternalStrikeEvent, radialMeters: number): void {
+    this.recordStrike(event.hit.speed, radialMeters, event.frameTimestampMs);
     const listeners = StrikeSystem.strikeListeners;
-    if (listeners.length > 0) {
-      const event: InternalStrikeEvent = {
-        hit,
-        hand: handedness,
-        frameTimestampMs,
-        frameEntryPerfNowMs: this.frameEntryPerfNowMs,
-      };
-      for (let i = 0; i < listeners.length; i += 1) {
-        listeners[i](event);
-      }
+    for (let i = 0; i < listeners.length; i += 1) {
+      listeners[i](event);
     }
-
-    return true;
   }
 
   update(_delta: number, time: number): void {
