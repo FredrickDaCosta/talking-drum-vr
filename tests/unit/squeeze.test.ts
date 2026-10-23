@@ -17,7 +17,10 @@ import {
   SqueezeTracker,
   squeezeFromCurl,
 } from '../../src/input/hand-squeeze.js';
-import { SqueezeCalibration } from '../../src/input/squeeze-calibration.js';
+import {
+  CALIBRATION_FAILED_MESSAGE,
+  SqueezeCalibration,
+} from '../../src/input/squeeze-calibration.js';
 
 const sq = APP_CONFIG.squeeze;
 const pitch = APP_CONFIG.pitch;
@@ -219,7 +222,8 @@ describe('squeeze calibration', () => {
   });
 
   it('fails safe to defaults when open and fist are too similar, values are implausible, or samples are too few', () => {
-    const similar = new SqueezeCalibration(sq);
+    const once = { ...sq, calibrationMaxAttempts: 1 };
+    const similar = new SqueezeCalibration(once);
     similar.start(0, false);
     run(similar, 0, 2100, () => 0.8);
     run(similar, 2100, 4300, () => 0.7);
@@ -229,18 +233,54 @@ describe('squeeze calibration', () => {
     expect(similar.fistCurl).toBe(sq.defaultFistCurl);
     expect(similar.prompt(4300)).toContain('default');
 
-    const implausible = new SqueezeCalibration(sq);
+    const implausible = new SqueezeCalibration(once);
     implausible.start(0, false);
     run(implausible, 0, 2100, () => 2.5);
     run(implausible, 2100, 4300, () => 0.4);
     expect(implausible.failureReason).toContain('implausible');
 
-    const lost = new SqueezeCalibration(sq);
+    const lost = new SqueezeCalibration(once);
     lost.start(0, false);
     lost.update(0, 0.9);
     run(lost, 1, 4500, () => Number.NaN);
     expect(lost.phase).toBe('failed');
     expect(lost.failureReason).toContain('too few samples');
+  });
+
+  it('retries a failed calibration once, then uses the defaults with one message', () => {
+    expect(sq.calibrationMaxAttempts).toBe(2);
+    const cal = new SqueezeCalibration(sq);
+    cal.start(0, false);
+    run(cal, 0, 2100, () => 0.8);
+    run(cal, 2100, 4300, () => 0.7); // too similar
+    expect(cal.phase).toBe('retrying');
+    expect(cal.attempts).toBe(1);
+    expect(cal.prompt(4300)).toContain('try once more');
+    expect(cal.openCurl).toBe(sq.defaultOpenCurl);
+    const retryAt = 4300 + sq.calibrationResultMessageMs;
+    run(cal, 4300, retryAt + 20, () => 0.8);
+    expect(cal.phase).toBe('open');
+    expect(cal.attempts).toBe(2);
+    run(cal, retryAt + 20, retryAt + 2200, () => 0.8);
+    run(cal, retryAt + 2200, retryAt + 4400, () => 0.75); // fails again
+    expect(cal.phase).toBe('failed');
+    expect(cal.prompt(retryAt + 4400)).toBe(CALIBRATION_FAILED_MESSAGE);
+    expect(cal.openCurl).toBe(sq.defaultOpenCurl);
+
+    // A retry that succeeds is kept.
+    const second = new SqueezeCalibration(sq);
+    second.start(0, false);
+    run(second, 0, 2100, () => 0.8);
+    run(second, 2100, 4300, () => 0.75);
+    run(second, 4300, 4300 + sq.calibrationResultMessageMs + 2200, () => 1.0);
+    run(
+      second,
+      4300 + sq.calibrationResultMessageMs + 2200,
+      4300 + sq.calibrationResultMessageMs + 4400,
+      () => 0.3,
+    );
+    expect(second.phase).toBe('done');
+    expect(second.fistCurl).toBeCloseTo(0.3, 9);
   });
 
   it('can be skipped (?calib=0) and cancelled; a finished calibration is kept', () => {

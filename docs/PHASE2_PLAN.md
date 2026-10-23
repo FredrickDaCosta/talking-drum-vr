@@ -1,6 +1,7 @@
 # Phase 2 Plan: "Listen, then echo" (`docs/PHASE2_PLAN.md`)
 
-> **Status:** P2a merged and deployed (#25). P2b (lesson engine and content) in review. P2c not started.
+> **Status:** P2a merged and deployed (#25). P2b merged and deployed (#26). P2c (polish, onboarding,
+> length, Quest test plan) in review.
 > Source: CTO design brief, 2026-10-23.
 
 ## 1. Game
@@ -27,7 +28,7 @@
 | Step    | Scope                                                                                                                                                              | Status       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | **P2a** | Pitch-hand squeeze, calibration, pitch mapping and L/M/H bands, pitch ladder, debug HUD                                                                            | Merged (#25) |
-| **P2b** | Lesson engine and content: a typed data file validated by `content:validate`; each entry has `reviewStatus: draft \| verified`; Yoruba text with proper diacritics | In review    |
+| **P2b** | Lesson engine and content: a typed data file validated by `content:validate`; each entry has `reviewStatus: draft \| verified`; Yoruba text with proper diacritics | Merged (#26) |
 | **P2c** | Onboarding, end screen, polish                                                                                                                                     | Not started  |
 
 - **Content:** Fredrick supplies it (starter list in review). **No Yoruba content is invented in code.**
@@ -110,16 +111,18 @@
 - **Entry fields:** `id`, `level` (1..3), `text` (Yoruba, NFC), `gloss`, `syllables`, `tones` (`L`/`M`/`H`,
   one per syllable), optional `note`, and `reviewStatus` (`draft` or `verified`). The engine reads only this
   file, so words can be corrected without code changes.
-- **Level 1:** five tone-only drills with no words (`M`, `H`, `L`, `H L`, `L H M`), marked `verified`
-  because they contain no Yoruba.
-- **Levels 2 and 3:** the brief's starter list, all `draft`.
-- **Splits I am unsure about** (Fredrick or a native speaker should confirm):
+- **Level 1:** tone-only drills with no words, marked `verified` because they contain no Yoruba.
+  - P2b: `M`, `H`, `L`, `H L`, `L H M`.
+  - P2c added three more: `L M`, `M H`, `H M L`.
+- **Levels 2 and 3:** the brief's starter list. **Reviewed by Fredrick on 2026-10-23** (tones, meanings,
+  diacritics and splits) and marked `verified`. **A second native-speaker review is pending.**
+- **Splits (CTO: these follow standard Yoruba orthography; keep them):
   - "gb" in `igba`/`igbá`/`ìgbà` is kept as one consonant (`i-gba`).
   - The syllabic nasal: `ọrùn`/`ọ̀run` is split `ọ-rùn`/`ọ̀-run`, with "n" kept in the final syllable rather
     than counted as its own tone-bearing syllable.
   - The long vowel in `Ẹ káàbọ̀` is two strikes (`ká-à`).
   - `ilé` in `Ẹ kú ilé` is split `i-lé`, with the "i" as its own syllable.
-  - All tones are copied from the brief and are unverified.
+  - The tones are from the brief and were confirmed in Fredrick's review.
 - **`content:validate`** (`src/content/validate-lessons.ts`, also run in the unit tests):
   - unique non-empty ids; level 1..3; a valid `reviewStatus`
   - tones count = syllables count; tones only L, M or H
@@ -164,17 +167,14 @@
 | `bandRatios`                                      | L 0.75, M 1.0, H 1.33                                                                   |
 | `demoVelocityMps`                                 | 1.5 m/s (fixed demo loudness)                                                           |
 | `syllableIntervalMs` / `demoLeadInMs`             | 600 / 150                                                                               |
-| `postDemoPauseMs`                                 | 500                                                                                     |
+| `postDemoPauseMs`                                 | 700 (P2c; was 500)                                                                      |
 | `attemptGapMs` / `idleReplayMs`                   | 4000 / 10000                                                                            |
 | `maxTries`                                        | 3                                                                                       |
-| `feedbackMs` / `levelIntroMs` / `levelCompleteMs` | 2000 / 2500 / 3000                                                                      |
-| `phrasesPerLevel` (`minEntriesPerLevel`)          | L1 5, L2 6, L3 4                                                                        |
+| `feedbackMs` / `levelIntroMs` / `levelCompleteMs` | 2500 / 3500 / 4000 (P2c; were 2000 / 2500 / 3000)                                       |
+| `phrasesPerLevel` (`minEntriesPerLevel`)          | L1 8, L2 12, L3 4 (P2c; were 5 / 6 / 4)                                                 |
 | `lessonPanel`                                     | 0.32 × 0.16 m, centre 0.30 m above and 0.05 m behind the drum origin; 1024 × 512 canvas |
 
-**Pacing estimate (UNVERIFIED):** with the timings above, an all-correct session takes about 2–3 minutes. A
-player who needs retries takes longer, up to about 6 minutes when every phrase needs all three tries. The
-brief's 6–8 minutes therefore needs more phrases per level, or the P2c onboarding. This is a config change
-once more content is verified.
+**Pacing:** see §5.2. The P2b estimate (2–3 min all-correct) was replaced by the P2c model.
 
 ### 4.4 Display
 
@@ -210,4 +210,121 @@ once more content is verified.
   - panel legibility and placement when seated
   - whether 600 ms per syllable and a 4 s gap feel right
   - session length with real players
-- **UNVERIFIED (content):** every level-2/3 word, split and tone until a native-speaker review.
+- **Content:** reviewed by Fredrick on 2026-10-23. A second native-speaker review is pending.
+
+## 5. P2c design (polish, onboarding, length, Quest test plan)
+
+### 5.1 Onboarding and title
+
+- **Welcome panel:** hidden for the whole XR session.
+  - The welcome panel sat 1.35 m away, behind the lesson panel. `PanelSystem` now sets it (and its entity
+    object) invisible on XR entry and shows it again in 2D.
+  - Its in-world Exit button is also disabled, so there is no invisible hit target. Exit with the headset
+    menu or the 2D page button.
+  - In XR the hands-required notice now goes to the lesson title screen (`statusChannel.inputNotice`).
+- **Title screen:**
+  - It states the controls in plain language: "Right hand: strike the drum." and "Left hand: squeeze to change
+    the pitch."
+  - Then "Strike the drum to begin." in large amber text.
+  - Calibration prompts and notices appear underneath.
+- **Text sizes:** config constants in `APP_CONFIG.lessonPanel.textPx`. 1 canvas px is 0.3125 mm on the
+  0.16 m-tall panel, so the 40 px instruction lines are ~12.5 mm (~1.3° at 0.55 m) and the 64 px prompt is
+  ~20 mm.
+  - The panel stays ≤ 0.61 m from the eye (unit-tested, ~0.59 m).
+- **Left hand lost during "Your turn":** the panel shows "Show your left hand to change pitch". The pitch is
+  already held at mid by `SqueezeSystem` (hold for 250 ms, then neutral squeeze 0.5 = band M) until the hand
+  is back.
+
+### 5.2 Session length and structure
+
+- **Config values:** the per-level phrase counts (`lesson.phrasesPerLevel`) and the retry cap
+  (`lesson.maxTries`).
+- **The session now plays:**
+  - L1: all 8 tone drills.
+  - L2: all 12 words in data-file order, which groups the minimal sets (ọkọ ×4, igba ×3, ọrun ×2, ìyá/ìyà,
+    bàbá), so each contrast is heard back to back. This is unit-tested.
+  - L3: all 4 phrases.
+- **Between levels:** "Level N complete" with that level's stars (4 s), then a plain "Level N" intro with the
+  level name (3.5 s).
+- **Estimate** (`src/game/session-estimate.ts`; a model, printed by the unit tests):
+
+  | Pace                                                                  | Estimate    |
+  | --------------------------------------------------------------------- | ----------- |
+  | Normal (average tries L1 1.4, L2 1.7, L3 1.9; 5–15% reach the answer) | **5.3 min** |
+  | Every phrase right first time                                         | 3.4 min     |
+  | Worst case (every phrase needs all three tries and the answer)        | 9.9 min     |
+  - The worst case stays under the 10-minute limit.
+  - **Assumptions (UNVERIFIED):**
+    - 15 s for the title and calibration
+    - 1.5 s from "Your turn" to the first strike, then 0.7 s between strikes
+    - the timings in §4.3
+
+- **Content needed to reach 6–8 min at a normal pace:** about +70 s, which is roughly **6 more two-syllable
+  L2 words** (≈11.5 s each at a normal pace) or **5 more three-syllable L3 phrases** (≈15 s each), or a mix
+  such as 3 L2 + 2 L3.
+  - No Yoruba was invented.
+  - Slowing the timings further was not done: it would pad the game rather than teach.
+
+### 5.3 End screen and restart
+
+- **END** shows total stars (★ earned / max) and a short message by share: ≥ 80% "Excellent drumming!",
+  ≥ 50% "Well played!", otherwise "Good start. Practice makes the drum talk."
+- **Restart:** "Strike the drum to play again" (after a 2.5 s guard) returns the reducer to a fresh state at
+  the level-1 intro.
+  - There is no reload, and calibration is kept.
+  - All lesson state (stars, attempt, strikes, result, demo) is reset.
+  - Listeners are subscribed once in `init()` and never per session, and the system uses no timers.
+  - The e2e test shows that one strike after a restart counts once.
+
+### 5.4 Feedback sounds (`src/audio/feedback-cues.ts`)
+
+- **"Correct":** two soft sine "bell" notes (G5 then C6, with a quiet octave partial), 0.7 s.
+- **"Try again":** a low triangle tone gliding 330 → 247 Hz through a 1.2 kHz low-pass, 0.45 s.
+- **Rendering:** both are rendered once at startup with `OfflineAudioContext`. They are original, with no
+  samples and no downloads (ASSET_REGISTER).
+- **Playback:** through the same `AudioContext`, non-spatially, at `audio.cueGain` 0.12 (below `minGain`
+  0.15).
+- **Loudness, verified in Chromium:** cue peak × cueGain = 0.055 vs the softest drum hit 0.168.
+- **Triggers:** the reducer emits `PLAY_CUE` on entering FEEDBACK: `correct`, or `retry` for retry and answer.
+
+### 5.5 Robustness
+
+- **XR session ends mid-lesson:** scheduled demo voices are stopped (`DrumAudio.stopScheduled()`) and the
+  lesson returns to TITLE. Re-entering plays on normally (e2e).
+- **Tab hidden, or headset view `hidden`, during a demo:**
+  - Demo voices stop and the reducer freezes (no TICKs).
+  - On return an `INTERRUPT` event restarts the demo, or restarts the "your turn" wait, so there is no stuck
+    state and no instant idle replay (unit + e2e).
+- **Calibration failing twice:** a failed run shows "Calibration unclear. Let's try once more." and retries
+  once (`squeeze.calibrationMaxAttempts: 2`). A second failure keeps the defaults with one message,
+  "Calibration unclear, so default hand settings are used."
+- **Strike during a demo:** ignored and counted in `ignoredStrikes`; it still sounds (it is a drum) but is
+  never scored (unit + e2e).
+- **Per-frame cost:**
+  - The reducer returns the same object on idle ticks.
+  - `LessonSystem.update()` allocates nothing per frame: preallocated TICK and event objects, a constant
+    empty-tone array, and redraws only on change.
+  - The HUD lesson line shows the rolling 1 s `cost avg / max`, which includes redraws. Headless Chromium
+    shows ~0.012 ms average and 0.10 ms max at the title.
+  - On Quest: UNVERIFIED.
+
+### 5.6 Quest test plan
+
+`docs/QUEST_TEST_PLAN.md`: a 45-minute, printable plan with an ordered checklist, what the HUD should show, the
+numbers to write down, the config keys to tune, a one-page results table, and how to capture evidence.
+
+### 5.7 Verification limits (P2c)
+
+- **Verified in IWER e2e:**
+  - the title screen in XR with the welcome panel hidden, and shown again in 2D
+  - the correct chime is played and is quieter than the drum
+  - a strike during a demo is ignored
+  - a hidden tab stops and restarts the demo
+  - three misses → answer → END → restart without a reload
+  - XR exit mid-lesson → TITLE → re-enter and play
+- **UNVERIFIED (Quest only):**
+  - the session length with real players
+  - how the cues sound through Quest speakers
+  - title and panel legibility when seated
+  - the Quest Browser's visibility events when the system menu opens
+  - the per-frame cost on the device

@@ -92,6 +92,11 @@ export interface DrumAudioConfig {
   readonly placeholderSampleRateHz: number;
   /** HRTF PannerNode reference distance (meters). */
   readonly pannerRefDistanceMeters: number;
+  /**
+   * Gain of the non-spatial "correct" / "try again" cues. Kept below minGain so a cue is quieter
+   * than even the softest drum hit (checked against the rendered peaks in the e2e suite).
+   */
+  readonly cueGain: number;
 }
 
 export interface XrInputNoticeConfig {
@@ -123,6 +128,8 @@ export interface SqueezeConfig {
   readonly minCalibrationSamples: number;
   /** How long the result message ("calibrated" / "using defaults") stays on screen (milliseconds). */
   readonly calibrationResultMessageMs: number;
+  /** Calibration runs (first try plus retries) before falling back to the defaults. */
+  readonly calibrationMaxAttempts: number;
   /** Plausible palm length (wrist to middle knuckle) in meters; outside this the frame is rejected. */
   readonly minPalmLengthMeters: number;
   readonly maxPalmLengthMeters: number;
@@ -178,7 +185,7 @@ export interface LessonConfig {
   readonly attemptGapMs: number;
   /** With no strike this long after the cue, the demo replays without costing a try (milliseconds). */
   readonly idleReplayMs: number;
-  /** Tries per phrase before the answer is shown. */
+  /** Tries per phrase before the answer is shown (the retry cap). */
   readonly maxTries: number;
   /** How long "Well done" / "Try again" stays up (milliseconds). */
   readonly feedbackMs: number;
@@ -200,6 +207,20 @@ export interface LessonPanelConfig {
   /** Canvas texture size in pixels (same aspect as the panel). */
   readonly canvasWidthPx: number;
   readonly canvasHeightPx: number;
+  /**
+   * Text sizes in canvas pixels (1 px = heightMeters / canvasHeightPx = 0.3125 mm on the panel).
+   * At ~0.55 m, 40 px (12.5 mm) subtends ~1.3 degrees.
+   */
+  readonly textPx: {
+    readonly header: number;
+    readonly word: number;
+    readonly syllable: number;
+    readonly gloss: number;
+    readonly status: number;
+    readonly bigStatus: number;
+    readonly detail: number;
+    readonly instruction: number;
+  };
 }
 
 export interface DiagnosticsConfig {
@@ -284,6 +305,7 @@ export const APP_CONFIG: AppConfig = {
     voicePoolSize: 8,
     placeholderSampleRateHz: 48000,
     pannerRefDistanceMeters: 0.5,
+    cueGain: 0.12,
   },
   xrInputNotice: {
     handDetectionGraceMs: 3000,
@@ -300,6 +322,7 @@ export const APP_CONFIG: AppConfig = {
     calibrationSettleMs: 500,
     minCalibrationSamples: 8,
     calibrationResultMessageMs: 2500,
+    calibrationMaxAttempts: 2,
     minPalmLengthMeters: 0.05,
     maxPalmLengthMeters: 0.16,
     minValidFingers: 2,
@@ -330,15 +353,15 @@ export const APP_CONFIG: AppConfig = {
     demoVelocityMps: 1.5,
     syllableIntervalMs: 600,
     demoLeadInMs: 150,
-    postDemoPauseMs: 500,
+    postDemoPauseMs: 700,
     attemptGapMs: 4000,
     idleReplayMs: 10000,
     maxTries: 3,
-    feedbackMs: 2000,
-    levelIntroMs: 2500,
-    levelCompleteMs: 3000,
-    phrasesPerLevel: { 1: 5, 2: 6, 3: 4 },
-    minEntriesPerLevel: { 1: 5, 2: 6, 3: 4 },
+    feedbackMs: 2500,
+    levelIntroMs: 3500,
+    levelCompleteMs: 4000,
+    phrasesPerLevel: { 1: 8, 2: 12, 3: 4 },
+    minEntriesPerLevel: { 1: 8, 2: 12, 3: 4 },
   },
   lessonPanel: {
     offsetMeters: [0, 0.3, -0.05],
@@ -346,6 +369,16 @@ export const APP_CONFIG: AppConfig = {
     heightMeters: 0.16,
     canvasWidthPx: 1024,
     canvasHeightPx: 512,
+    textPx: {
+      header: 30,
+      word: 96,
+      syllable: 40,
+      gloss: 34,
+      status: 50,
+      bigStatus: 64,
+      detail: 30,
+      instruction: 40,
+    },
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

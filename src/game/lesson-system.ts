@@ -54,6 +54,16 @@ export interface LessonDiagnostics extends DebugHudLessonProbe {
   history: string[];
   panelRedraws: number;
   fontStatus: string;
+  /** Strikes that arrived while not scoring (e.g. during a demo); never counted in an attempt. */
+  ignoredStrikes: number;
+  /** Times the tab or headset view was hidden mid-lesson (demo voices stopped, restarted on return). */
+  interruptions: number;
+  /** Fresh sessions started from END ("strike to play again"). */
+  restarts: number;
+  /** XR sessions that ended mid-lesson (returned to TITLE). */
+  xrResets: number;
+  cuesPlayed: number;
+  pitchHandLost: boolean;
 }
 
 /** Debug only (?debug=1): the panel canvas and a font-specimen hook for the diacritics check. */
@@ -71,6 +81,8 @@ declare global {
 }
 
 const HISTORY_LIMIT = 200;
+const COST_WINDOW_MS = 1000;
+const NO_TONES: readonly PitchBand[] = [];
 const CALIBRATION_FINISHED = new Set(['done', 'failed', 'skipped']);
 
 /**
@@ -124,7 +136,21 @@ export class LessonSystem extends createSystem({
     history: [],
     panelRedraws: 0,
     fontStatus: 'not-loaded',
+    ignoredStrikes: 0,
+    interruptions: 0,
+    restarts: 0,
+    xrResets: 0,
+    cuesPlayed: 0,
+    pitchHandLost: false,
+    frameCostAvgMs: Number.NaN,
+    frameCostMaxMs: Number.NaN,
   };
+  private hidden = false;
+  private shownNotice: string | null = null;
+  private costSumMs = 0;
+  private costCount = 0;
+  private costMaxMs = 0;
+  private costWindowStartMs = 0;
 
   init(): void {
     const flags = getAppFlags();
@@ -151,21 +177,47 @@ export class LessonSystem extends createSystem({
       // DrumAudioSystem's listener ran first and latched this strike's band.
       const latched = pitchHand.latchedBand;
       const band: PitchBand = latched === 'none' ? pitchHand.band : latched;
-      this.dispatch({ type: 'STRIKE', band, timeMs: performance.now() });
-    });
-    // Leaving XR returns to the title; calibration is kept for the page session.
-    const unsubscribeVisibility = this.world.visibilityState.subscribe((visibility) => {
-      if (visibility === VisibilityState.NonImmersive && this.state.phase !== 'TITLE') {
-        this.state = createLessonState(
-          this.startLevelIndex,
-          this.startPhraseIndex,
-          performance.now(),
-        );
-        this.onTransition();
+      const scoring = this.state.phase === 'YOUR_TURN';
+      if (!this.dispatch({ type: 'STRIKE', band, timeMs: performance.now() }) && !scoring) {
+        this.diag.ignoredStrikes += 1;
       }
     });
+    // Leaving XR returns to the title (stopping any demo still scheduled); calibration is kept
+    // for the page session. A hidden headset view pauses the lesson like a hidden tab.
+    const unsubscribeVisibility = this.world.visibilityState.subscribe((visibility) => {
+      if (visibility === VisibilityState.NonImmersive) {
+        this.hidden = false;
+        drumAudio.stopScheduled();
+        if (this.state.phase !== 'TITLE') {
+          this.diag.xrResets += 1;
+          this.state = createLessonState(
+            this.startLevelIndex,
+            this.startPhraseIndex,
+            performance.now(),
+          );
+          this.onTransition();
+        }
+      } else if (visibility === VisibilityState.Hidden) {
+        this.onHidden();
+      } else {
+        this.onShown();
+      }
+    });
+    const onDocumentVisibility = (): void => {
+      if (document.visibilityState === 'hidden') {
+        this.onHidden();
+      } else {
+        this.onShown();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onDocumentVisibility);
+    }
     this.cleanupFuncs.push(unsubscribeStrike, unsubscribeVisibility, () => {
       ladderOverride.active = false;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onDocumentVisibility);
+      }
     });
     if (typeof window !== 'undefined') {
       window.__talkingDrumLesson = this.diag;
@@ -173,44 +225,111 @@ export class LessonSystem extends createSystem({
   }
 
   update(): void {
+    const nowMs = performance.now();
     this.followDrum();
 
-    const nowMs = performance.now();
-    if (this.state.phase === 'CALIBRATION' && CALIBRATION_FINISHED.has(pitchHand.calibration)) {
-      this.calibrationReady.timeMs = nowMs;
-      this.dispatch(this.calibrationReady);
+    if (!this.hidden) {
+      if (this.state.phase === 'CALIBRATION' && CALIBRATION_FINISHED.has(pitchHand.calibration)) {
+        this.calibrationReady.timeMs = nowMs;
+        this.dispatch(this.calibrationReady);
+      }
+      this.tick.timeMs = nowMs;
+      this.dispatch(this.tick);
     }
-    this.tick.timeMs = nowMs;
-    this.dispatch(this.tick);
 
     this.updateDemoIndex(nowMs);
 
+    const phase = this.state.phase;
     const prompt = statusChannel.calibrationPrompt;
-    if (prompt !== this.shownPrompt) {
+    const notice = statusChannel.inputNotice;
+    if (prompt !== this.shownPrompt || notice !== this.shownNotice) {
       this.shownPrompt = prompt;
-      if (this.state.phase === 'TITLE' || this.state.phase === 'CALIBRATION') {
+      this.shownNotice = notice;
+      if (phase === 'TITLE' || phase === 'CALIBRATION') {
+        this.dirty = true;
+      }
+    }
+    // Pitch hand missing: SqueezeSystem already holds the pitch at mid (neutral squeeze).
+    const lost = pitchHand.tracking === 'LOST';
+    if (lost !== this.diag.pitchHandLost) {
+      this.diag.pitchHandLost = lost;
+      if (phase === 'YOUR_TURN') {
         this.dirty = true;
       }
     }
     if (this.dirty) {
       this.redraw();
     }
+    this.recordFrameCost(nowMs, performance.now() - nowMs);
   }
 
-  private dispatch(event: LessonEvent): void {
-    const next = reduceLesson(this.state, event, this.plan, APP_CONFIG.lesson);
-    if (next !== this.state) {
-      this.state = next;
-      this.onTransition();
+  /** Rolling 1 s average and max of this system's update() cost (debug HUD). No allocation. */
+  private recordFrameCost(nowMs: number, costMs: number): void {
+    this.costSumMs += costMs;
+    this.costCount += 1;
+    if (costMs > this.costMaxMs) {
+      this.costMaxMs = costMs;
     }
+    if (nowMs - this.costWindowStartMs >= COST_WINDOW_MS) {
+      this.diag.frameCostAvgMs = this.costSumMs / this.costCount;
+      this.diag.frameCostMaxMs = this.costMaxMs;
+      this.costSumMs = 0;
+      this.costCount = 0;
+      this.costMaxMs = 0;
+      this.costWindowStartMs = nowMs;
+      if (this.debugEnabled) {
+        DebugHud.active?.updateLessonProbe(this.diag);
+      }
+    }
+  }
+
+  /** Tab or headset view hidden: stop demo voices now; the reducer is frozen until shown again. */
+  private onHidden(): void {
+    if (this.hidden) {
+      return;
+    }
+    this.hidden = true;
+    drumAudio.stopScheduled();
+    if (this.state.phase !== 'TITLE' && this.state.phase !== 'END') {
+      this.diag.interruptions += 1;
+    }
+  }
+
+  /** Shown again: a cut-off demo restarts and "your turn" waits afresh (no stuck state). */
+  private onShown(): void {
+    if (!this.hidden) {
+      return;
+    }
+    this.hidden = false;
+    this.dispatch({ type: 'INTERRUPT', timeMs: performance.now() });
+  }
+
+  /** Feeds one event to the reducer; returns true if the state changed. */
+  private dispatch(event: LessonEvent): boolean {
+    const previous = this.state;
+    const next = reduceLesson(previous, event, this.plan, APP_CONFIG.lesson);
+    if (next === previous) {
+      return false;
+    }
+    if (previous.phase === 'END' && next.phase !== 'END') {
+      this.diag.restarts += 1;
+    }
+    this.state = next;
+    this.onTransition();
+    return true;
   }
 
   private onTransition(): void {
     const state = this.state;
     for (const effect of state.effects) {
       if (effect.type === 'PLAY_DEMO') {
+        drumAudio.stopScheduled();
         this.playDemo(effect.tones, effect.leadInMs, effect.intervalMs);
         this.diag.demoReason = effect.reason;
+      } else if (effect.type === 'PLAY_CUE') {
+        if (drumAudio.playCue(effect.cue) === 'played') {
+          this.diag.cuesPlayed += 1;
+        }
       }
     }
     if (state.phase !== 'DEMO') {
@@ -245,7 +364,7 @@ export class LessonSystem extends createSystem({
     let index = -1;
     const state = this.state;
     if (state.phase === 'DEMO') {
-      const tones = currentPhrase(state, this.plan)?.tones ?? [];
+      const tones = currentPhrase(state, this.plan)?.tones ?? NO_TONES;
       const intervalMs = APP_CONFIG.lesson.syllableIntervalMs;
       const running = drumAudio.context?.state === 'running';
       const elapsedMs =
@@ -376,7 +495,9 @@ export class LessonSystem extends createSystem({
     }
     const view = buildLessonView(this.state, this.plan, {
       calibrationPrompt: this.shownPrompt,
+      inputNotice: this.shownNotice,
       demoIndex: this.demoIndex,
+      pitchHandLost: this.diag.pitchHandLost,
     });
     drawLessonPanel(this.ctx2d, view, this.canvas.width, this.canvas.height);
     this.texture.needsUpdate = true;

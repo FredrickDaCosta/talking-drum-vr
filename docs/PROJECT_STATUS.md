@@ -7,9 +7,9 @@
 
 ## Current Stage
 
-**Phase 2, step P2b (lesson engine and content): IN REVIEW** on branch `feat/p2b-lessons`. The PR is open;
-do NOT merge until the CTO approves. P2a was ACCEPTED and merged in #25 (`2487027`), then deployed (Deploy run
-40013067378, live smoke 7 passed). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+**Phase 2, step P2c (polish, onboarding, length, Quest test plan): IN REVIEW** on branch
+`feat/p2c-polish`. The PR is open; do NOT merge until the CTO approves. P2b was ACCEPTED and merged in #26
+(`ac4a7e1`), then deployed (Deploy run 40021633797, live smoke 10 passed). P2a merged in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
 diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
 `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
 CTO/PM writes the task prompts and Fredrick relays them.
@@ -102,15 +102,18 @@ CTO/PM writes the task prompts and Fredrick relays them.
       calibration (`?calib=0` skips it), log pitch mapping 0.75–1.0–1.33, L/M/H bands with hysteresis,
       strike-frame latch into `DrumAudio.play({ velocity, pitchRatio })`, pitch ladder, debug HUD pitch line.
 - [ ] Fredrick: P2a emulator checklist (`docs/TEST_PLAN.md §3.3`) after deploy.
-- [x] P2b in review (`feat/p2b-lessons`): lesson data and validation, a pure lesson reducer and
+- [x] P2b merged (#26, `ac4a7e1`) and deployed: lesson data and validation, a pure lesson reducer and
       `LessonSystem`, `DrumAudio.playAt` demos on the audio clock, the canvas lesson panel with a bundled Noto
       Sans subset for Yoruba diacritics, a HUD lesson line, and `?lesson=<id>`. See `docs/PHASE2_PLAN.md §4`.
 - [ ] Fredrick: P2b emulator checklist (`docs/TEST_PLAN.md §3.4`) after deploy.
-- [ ] Fredrick / native speaker: review the 16 draft L2/L3 entries (splits flagged in `PHASE2_PLAN.md §4.1`)
-      and set `reviewStatus: 'verified'`.
-- [ ] Pacing: an all-correct session is about 2–3 min (UNVERIFIED). Raise `phrasesPerLevel` once more content
-      is verified, to reach the 6–8 min target.
-- [ ] P2c: onboarding, end screen, polish.
+- [x] Fredrick reviewed all 16 L2/L3 entries (2026-10-23): all marked `verified`.
+- [ ] Second native-speaker review of the L2/L3 content.
+- [x] P2c in review (`feat/p2c-polish`): title screen and welcome-panel hiding, full-length session plan,
+      END screen and restart, procedural feedback cues, robustness, a HUD frame-cost reading, and
+      `docs/QUEST_TEST_PLAN.md`. See `docs/PHASE2_PLAN.md §5`.
+- [ ] Session length: ≈5.3 min at a normal pace (a model; UNVERIFIED). About 6 more L2 words or 5 more L3
+      phrases from Fredrick would reach 6–8 min.
+- [ ] Fredrick: run `docs/QUEST_TEST_PLAN.md` on a borrowed Quest and send back the results table.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 
 ### Open Items After M1 (owner in brackets)

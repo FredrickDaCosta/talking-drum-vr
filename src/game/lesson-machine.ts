@@ -6,7 +6,9 @@ import type { LessonEntry, LessonLevel } from '../content/lesson-types.js';
  *
  * TITLE -(strike)-> CALIBRATION -(calibration finished)-> LEVEL_INTRO -> DEMO -> YOUR_TURN
  * -> EVALUATE -> FEEDBACK -> (next phrase: DEMO | retry: DEMO | after the last try: answer DEMO,
- * then next phrase) -> LEVEL_COMPLETE -> LEVEL_INTRO (next level) | END -(strike)-> TITLE.
+ * then next phrase) -> LEVEL_COMPLETE -> LEVEL_INTRO (next level) | END -(strike)-> LEVEL_INTRO
+ * (a fresh session; the squeeze calibration is kept). INTERRUPT (tab or headset hidden, then shown
+ * again) restarts a demo that was cut off and the "your turn" wait.
  *
  * `reduceLesson` returns the SAME state object when nothing changes (no allocation on idle ticks)
  * and a new object on every transition. Side effects (play a demo) are listed in `effects` of the
@@ -42,13 +44,17 @@ export interface AttemptResult {
   readonly played: readonly PitchBand[];
 }
 
-export type LessonEffect = {
-  readonly type: 'PLAY_DEMO';
-  readonly tones: readonly PitchBand[];
-  readonly leadInMs: number;
-  readonly intervalMs: number;
-  readonly reason: DemoReason;
-};
+export type FeedbackCue = 'correct' | 'retry';
+
+export type LessonEffect =
+  | {
+      readonly type: 'PLAY_DEMO';
+      readonly tones: readonly PitchBand[];
+      readonly leadInMs: number;
+      readonly intervalMs: number;
+      readonly reason: DemoReason;
+    }
+  | { readonly type: 'PLAY_CUE'; readonly cue: FeedbackCue };
 
 export interface PlannedLevel {
   readonly level: LessonLevel;
@@ -84,7 +90,8 @@ export interface LessonState {
 export type LessonEvent =
   | { readonly type: 'STRIKE'; readonly band: PitchBand; readonly timeMs: number }
   | { readonly type: 'TICK'; readonly timeMs: number }
-  | { readonly type: 'CALIBRATION_READY'; readonly timeMs: number };
+  | { readonly type: 'CALIBRATION_READY'; readonly timeMs: number }
+  | { readonly type: 'INTERRUPT'; readonly timeMs: number };
 
 export const LEVEL_TITLES: Record<LessonLevel, string> = {
   1: 'Single tones',
@@ -93,6 +100,8 @@ export const LEVEL_TITLES: Record<LessonLevel, string> = {
 };
 
 const NO_EFFECTS: readonly LessonEffect[] = [];
+const CORRECT_CUE: readonly LessonEffect[] = [{ type: 'PLAY_CUE', cue: 'correct' }];
+const RETRY_CUE: readonly LessonEffect[] = [{ type: 'PLAY_CUE', cue: 'retry' }];
 const NO_STRIKES: readonly LessonStrike[] = [];
 
 /** Phrases per level in data-file order (config counts). `startId` jumps to that phrase. */
@@ -249,6 +258,16 @@ export function reduceLesson(
   const t = event.timeMs;
   const phrase = currentPhrase(state, plan);
 
+  if (event.type === 'INTERRUPT') {
+    if (state.phase === 'DEMO') {
+      return startDemo(state, plan, config, t, state.demoReason ?? 'first');
+    }
+    if (state.phase === 'YOUR_TURN') {
+      return next(state, { cueAtMs: t, strikes: NO_STRIKES, lastStrikeMs: -Infinity });
+    }
+    return state;
+  }
+
   switch (state.phase) {
     case 'TITLE':
       return event.type === 'STRIKE'
@@ -325,6 +344,7 @@ export function reduceLesson(
           phase: 'FEEDBACK',
           enteredAtMs: t,
           feedback: 'correct',
+          effects: CORRECT_CUE,
           stars: {
             ...state.stars,
             [phrase?.id ?? '']: starsForCorrectTry(state.attempt, config.maxTries),
@@ -335,6 +355,7 @@ export function reduceLesson(
         phase: 'FEEDBACK',
         enteredAtMs: t,
         feedback: state.attempt >= config.maxTries ? 'answer' : 'retry',
+        effects: RETRY_CUE,
       });
     }
 
@@ -367,9 +388,10 @@ export function reduceLesson(
       return next(state, { phase: 'END', enteredAtMs: t });
 
     case 'END':
-      // A short guard so the strike that finished the last phrase cannot restart the session.
+      // "Strike the drum to play again": a fresh session from the first level, straight to the
+      // level intro (calibration is kept). A short guard stops the last echo from restarting it.
       return event.type === 'STRIKE' && t - state.enteredAtMs >= config.feedbackMs
-        ? { ...createLessonState(0, 0, t), version: state.version + 1 }
+        ? { ...createLessonState(0, 0, t), phase: 'LEVEL_INTRO', version: state.version + 1 }
         : state;
   }
 }
