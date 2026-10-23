@@ -163,6 +163,45 @@ export interface PitchLadderConfig {
   readonly heightMeters: number;
 }
 
+export interface LessonConfig {
+  /** Demo playback ratio for each tone band (the drum "speaks" these pitches). */
+  readonly bandRatios: Readonly<Record<PitchBand, number>>;
+  /** Demo strike speed passed as `velocity` (m/s) to DrumAudio. */
+  readonly demoVelocityMps: number;
+  /** Time between demo syllables, on the audio clock (milliseconds). */
+  readonly syllableIntervalMs: number;
+  /** Delay from scheduling a demo to its first syllable (milliseconds). */
+  readonly demoLeadInMs: number;
+  /** Pause after the demo's last syllable before "Your turn" (milliseconds). */
+  readonly postDemoPauseMs: number;
+  /** An attempt ends this long after the last strike if it is still incomplete (milliseconds). */
+  readonly attemptGapMs: number;
+  /** With no strike this long after the cue, the demo replays without costing a try (milliseconds). */
+  readonly idleReplayMs: number;
+  /** Tries per phrase before the answer is shown. */
+  readonly maxTries: number;
+  /** How long "Well done" / "Try again" stays up (milliseconds). */
+  readonly feedbackMs: number;
+  /** How long the level title stays up before the first demo (milliseconds). */
+  readonly levelIntroMs: number;
+  /** How long the level result stays up (milliseconds). */
+  readonly levelCompleteMs: number;
+  /** Phrases played per level (taken in data-file order). */
+  readonly phrasesPerLevel: Readonly<Record<1 | 2 | 3, number>>;
+  /** content:validate fails if a level has fewer entries than this. */
+  readonly minEntriesPerLevel: Readonly<Record<1 | 2 | 3, number>>;
+}
+
+export interface LessonPanelConfig {
+  /** Panel centre offset from the drum origin in world axes (meters): above and just behind the drum. */
+  readonly offsetMeters: readonly [number, number, number];
+  readonly widthMeters: number;
+  readonly heightMeters: number;
+  /** Canvas texture size in pixels (same aspect as the panel). */
+  readonly canvasWidthPx: number;
+  readonly canvasHeightPx: number;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -184,6 +223,8 @@ export interface AppConfig {
   readonly squeeze: SqueezeConfig;
   readonly pitch: PitchConfig;
   readonly pitchLadder: PitchLadderConfig;
+  readonly lesson: LessonConfig;
+  readonly lessonPanel: LessonPanelConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -283,6 +324,28 @@ export const APP_CONFIG: AppConfig = {
   pitchLadder: {
     offsetMeters: [-0.2, 0.05, 0.08],
     heightMeters: 0.18,
+  },
+  lesson: {
+    bandRatios: { L: 0.75, M: 1.0, H: 1.33 },
+    demoVelocityMps: 1.5,
+    syllableIntervalMs: 600,
+    demoLeadInMs: 150,
+    postDemoPauseMs: 500,
+    attemptGapMs: 4000,
+    idleReplayMs: 10000,
+    maxTries: 3,
+    feedbackMs: 2000,
+    levelIntroMs: 2500,
+    levelCompleteMs: 3000,
+    phrasesPerLevel: { 1: 5, 2: 6, 3: 4 },
+    minEntriesPerLevel: { 1: 5, 2: 6, 3: 4 },
+  },
+  lessonPanel: {
+    offsetMeters: [0, 0.3, -0.05],
+    widthMeters: 0.32,
+    heightMeters: 0.16,
+    canvasWidthPx: 1024,
+    canvasHeightPx: 512,
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Phase 2, step P2b (lesson engine and content):**
+  - Typed lesson data (`src/content/lessons.ts`; types in `lesson-types.ts`): 5 level-1 tone drills
+    (verified), plus 12 level-2 and 4 level-3 entries from the starter list (all `draft`).
+  - `content:validate` checks lessons with `src/content/validate-lessons.ts`. It checks unique ids, that
+    tones match syllables, that tones are L/M/H only, NFC text, spelling, and a minimum per level. It also
+    logs draft ids; drafts do not fail the build.
+  - Pure "listen, then echo" reducer (`src/game/lesson-machine.ts`) with a thin `LessonSystem`. The phases
+    are: title, calibration, level intro, demo, your turn, evaluate, feedback, level complete, end.
+    - Stars are 3/2/1 for a correct echo on the 1st/2nd/3rd try. After the third miss the answer is
+      replayed and the phrase scores 0 stars.
+    - With no strike for 10 s, the demo replays without costing a try.
+  - `DrumAudio.playAt(when, { velocity, pitchRatio })`: demos are scheduled on the `AudioContext` clock.
+  - In-world lesson panel above the drum, drawn to a canvas texture (`src/ui/lesson-panel-canvas.ts`). It
+    shows the word, syllables, tone arrows, gloss, state text, try number and stars. It uses a bundled Noto
+    Sans subset (OFL, `public/fonts/`) because UIKit's font has no Yoruba letters or tone marks.
+  - During a demo, the pitch ladder shows the demo's tones.
+  - `?debug=1` HUD lesson line; `?lesson=<id>` starts at a phrase.
 - **Phase 2, step P2a (pitch-hand squeeze and pitch):**
   - Squeeze 0..1 from the left hand's WebXR joints (`src/input/hand-squeeze.ts`): tip → own-knuckle curl
     normalised by palm length, One Euro smoothing, and hold-then-neutral on dropouts.

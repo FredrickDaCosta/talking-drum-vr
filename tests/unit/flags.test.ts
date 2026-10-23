@@ -41,6 +41,18 @@ describe('parseAppFlags', () => {
     });
     expect(parseAppFlags('?hand=invalid')).toEqual({ xrfps: false, debug: false });
   });
+
+  it('parses ?lesson=<id> and rejects ids outside [a-z0-9-]', () => {
+    expect(parseAppFlags('?lesson=l2-oko-mh&calib=0')).toEqual({
+      xrfps: false,
+      debug: false,
+      calib: false,
+      lesson: 'l2-oko-mh',
+    });
+    expect(parseAppFlags('?lesson=L1-M')).toEqual({ xrfps: false, debug: false, lesson: 'l1-m' });
+    expect(parseAppFlags('?lesson=<script>')).toEqual({ xrfps: false, debug: false });
+    expect(parseAppFlags('?lesson=')).toEqual({ xrfps: false, debug: false });
+  });
 });
 
 describe('APP_CONFIG', () => {

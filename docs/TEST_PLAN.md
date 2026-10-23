@@ -166,3 +166,35 @@ three-rung ladder to the left of the drum.
 
 **UNVERIFIED (Quest only):** a real fist, the curl range of real hands, comfort, and whether the default
 open/fist values and band thresholds feel right.
+
+### 3.4 P2b Lesson Checklist (Fredrick, after the P2b PR is merged and deployed)
+
+Open `https://drum.da-costa.online/?debug=1&calib=0`. Switch the emulator to **hands** and click
+**Enter VR**. Watch the lesson panel above the drum and the fourth HUD line (`lesson: …`).
+
+1. **Title.** The panel reads "Strike the drum to begin". Strike once with the RIGHT hand.
+   - Expected: the HUD goes `CALIBRATION` → `LEVEL_INTRO` ("Level 1: Single tones") → `DEMO`.
+   - Observed: `[ ___ ]`
+2. **Demo.** You hear one drum tone; the arrow box is highlighted and the ladder marker jumps to that tone.
+   - Observed: `[ ___ ]`
+3. **Echo, right.** For `l1-m` (mid), set the left hand to **Point** (band M) and strike once.
+   - Expected: "Well done", 3 stars, then the next phrase's demo.
+   - Observed: `[ ___ ]`
+4. **Echo, wrong.** On a low phrase (`?lesson=l1-l`), strike with **Point** (M).
+   - Expected: "Try again", `try 2/3`, and the demo replays.
+   - Then use **default** (L): "Well done" with 2 stars.
+   - Observed: `[ ___ ]`
+5. **Idle replay.** On "Your turn", wait 10 s without striking.
+   - Expected: the demo replays and the try number stays the same.
+   - Observed: `[ ___ ]`
+6. **Diacritics.** Open `?debug=1&calib=0&lesson=l3-e-kaabo`, enter VR and strike once.
+   - Expected: "Ẹ káàbọ̀" with the dot below Ẹ and ọ, the acute on á and the grave on à and ọ̀; none of them
+     shows as a box or a gap.
+   - Observed: `[ ___ ]`
+7. **Three misses.** On any phrase, strike a wrong tone three times.
+   - Expected: "Not this time", the answer is replayed with highlights, then the next phrase.
+   - Observed: `[ ___ ]`
+8. **Console.** Any red errors? `[ ___ ]`
+
+**UNVERIFIED (Quest only):** band H in a real lesson (fist), demo audio sync, panel legibility when
+seated, and session length.

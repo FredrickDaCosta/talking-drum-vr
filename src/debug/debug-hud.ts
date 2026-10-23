@@ -32,6 +32,24 @@ export interface DebugHudAudioProbe {
   };
 }
 
+/** Lesson state published by LessonSystem (also on window.__talkingDrumLesson). */
+export interface DebugHudLessonProbe {
+  phase: string;
+  level: number;
+  phraseId: string;
+  attempt: number;
+  maxTries: number;
+  /** 'none' | 'correct' | 'wrong' | 'incomplete' */
+  lastResult: string;
+  totalStars: number;
+  maxStars: number;
+}
+
+/** Debug-only lesson line: state, level, phrase id, attempt, last result, stars. */
+export function formatLessonProbe(p: DebugHudLessonProbe): string {
+  return `lesson: ${p.phase} | level ${p.level} | phrase ${p.phraseId} | try ${p.attempt}/${p.maxTries} | last ${p.lastResult} | stars ${p.totalStars}/${p.maxStars}`;
+}
+
 export const AUDIO_PROBE_LABEL = 'software + audio buffer estimate';
 
 function formatMs(ms: number, digits: number): string {
@@ -90,6 +108,7 @@ function formatSignedMeters(meters: number): string {
  * Line 1: active hand tracking state (TRACKED, EMULATED, UNTRACKED), signed distance
  * to the top drumhead skin plane, strike count, last strike speed, and radial position.
  * Line 2: the software + audio buffer latency estimate (see formatAudioProbe).
+ * Lines 3 and 4: the pitch hand (formatPitchProbe) and the lesson state (formatLessonProbe).
  * Throttles DOM writes while immediately flushing discrete state or strike count changes.
  */
 export class DebugHud {
@@ -102,6 +121,8 @@ export class DebugHud {
   private lastAudioText = '';
   private pitchLine: HTMLDivElement | null = null;
   private lastPitchText = '';
+  private lessonLine: HTMLDivElement | null = null;
+  private lastLessonText = '';
   private readonly throttleIntervalMs: number;
   private lastWriteTimestampMs = -Infinity;
   private lastRenderedStrikeCount = -1;
@@ -145,8 +166,11 @@ export class DebugHud {
     audioLine.dataset.testid = 'debug-hud-audio';
     const pitchLine = document.createElement('div');
     pitchLine.dataset.testid = 'debug-hud-pitch';
-    el.append(mainLine, audioLine, pitchLine);
+    const lessonLine = document.createElement('div');
+    lessonLine.dataset.testid = 'debug-hud-lesson';
+    el.append(mainLine, audioLine, pitchLine, lessonLine);
     this.pitchLine = pitchLine;
+    this.lessonLine = lessonLine;
     parent.appendChild(el);
     this.element = el;
     this.mainLine = mainLine;
@@ -213,6 +237,17 @@ export class DebugHud {
     }
   }
 
+  updateLessonProbe(probe: DebugHudLessonProbe): void {
+    if (this.lessonLine === null) {
+      return;
+    }
+    const nextText = formatLessonProbe(probe);
+    if (nextText !== this.lastLessonText) {
+      this.lessonLine.textContent = nextText;
+      this.lastLessonText = nextText;
+    }
+  }
+
   updateAudioProbe(probe: DebugHudAudioProbe): void {
     if (this.audioLine === null) {
       return;
@@ -239,6 +274,8 @@ export class DebugHud {
       this.audioLine = null;
       this.pitchLine = null;
       this.lastPitchText = '';
+      this.lessonLine = null;
+      this.lastLessonText = '';
       this.lastText = '';
       this.lastAudioText = '';
       if (DebugHud.active === this) {

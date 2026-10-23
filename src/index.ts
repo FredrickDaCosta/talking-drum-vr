@@ -3,6 +3,7 @@ import projectOptions from 'virtual:iwsdk-project';
 import { trackStartupWithBanner } from './app/loading-banner.js';
 import { installAudioResumeOnVisible, installAudioUnlockListeners } from './audio/audio-unlock.js';
 import { DrumAudioSystem } from './audio/drum-audio-system.js';
+import { LessonSystem } from './game/lesson-system.js';
 import { PitchLadderSystem } from './game/pitch-ladder-system.js';
 import { StrikeSystem } from './game/strike-system.js';
 import { SqueezeSystem } from './input/squeeze-system.js';
@@ -21,6 +22,8 @@ void trackStartupWithBanner(
       world.registerSystem(SqueezeSystem);
       world.registerSystem(StrikeSystem);
       world.registerSystem(DrumAudioSystem);
+      // After DrumAudioSystem: its strike listener latches the band this one reads.
+      world.registerSystem(LessonSystem);
       world.registerSystem(PitchLadderSystem);
       return world;
     },

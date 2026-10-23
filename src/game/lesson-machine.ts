@@ -1,0 +1,384 @@
+import { APP_CONFIG, type LessonConfig, type PitchBand } from '../app/config.js';
+import type { LessonEntry, LessonLevel } from '../content/lesson-types.js';
+
+/**
+ * "Listen, then echo" lesson flow as a pure reducer. The drum strike is the only control.
+ *
+ * TITLE -(strike)-> CALIBRATION -(calibration finished)-> LEVEL_INTRO -> DEMO -> YOUR_TURN
+ * -> EVALUATE -> FEEDBACK -> (next phrase: DEMO | retry: DEMO | after the last try: answer DEMO,
+ * then next phrase) -> LEVEL_COMPLETE -> LEVEL_INTRO (next level) | END -(strike)-> TITLE.
+ *
+ * `reduceLesson` returns the SAME state object when nothing changes (no allocation on idle ticks)
+ * and a new object on every transition. Side effects (play a demo) are listed in `effects` of the
+ * new state for the host system to execute once.
+ */
+
+export type LessonPhase =
+  | 'TITLE'
+  | 'CALIBRATION'
+  | 'LEVEL_INTRO'
+  | 'DEMO'
+  | 'YOUR_TURN'
+  | 'EVALUATE'
+  | 'FEEDBACK'
+  | 'LEVEL_COMPLETE'
+  | 'END';
+
+export type FeedbackKind = 'correct' | 'retry' | 'answer';
+export type DemoReason = 'first' | 'retry' | 'idle' | 'answer';
+
+export interface LessonStrike {
+  readonly band: PitchBand;
+  readonly timeMs: number;
+}
+
+export interface AttemptResult {
+  /** All syllables struck, each in the target band, in order. */
+  readonly correct: boolean;
+  /** As many strikes as syllables arrived before the attempt ended. */
+  readonly complete: boolean;
+  /** Per target syllable: struck in the right band (false if missing). */
+  readonly perSyllable: readonly boolean[];
+  readonly played: readonly PitchBand[];
+}
+
+export type LessonEffect = {
+  readonly type: 'PLAY_DEMO';
+  readonly tones: readonly PitchBand[];
+  readonly leadInMs: number;
+  readonly intervalMs: number;
+  readonly reason: DemoReason;
+};
+
+export interface PlannedLevel {
+  readonly level: LessonLevel;
+  readonly phrases: readonly LessonEntry[];
+}
+
+export interface SessionPlan {
+  readonly levels: readonly PlannedLevel[];
+}
+
+export interface LessonState {
+  readonly phase: LessonPhase;
+  readonly enteredAtMs: number;
+  readonly levelIndex: number;
+  readonly phraseIndex: number;
+  /** 1-based try number for the current phrase. */
+  readonly attempt: number;
+  readonly strikes: readonly LessonStrike[];
+  readonly lastStrikeMs: number;
+  readonly cueAtMs: number;
+  readonly demoReason: DemoReason | null;
+  readonly demoStartMs: number;
+  readonly demoEndsAtMs: number;
+  readonly lastResult: AttemptResult | null;
+  readonly feedback: FeedbackKind | null;
+  /** Stars per phrase id (0..3), filled as phrases finish. */
+  readonly stars: Readonly<Record<string, number>>;
+  readonly effects: readonly LessonEffect[];
+  /** Increments on every transition. */
+  readonly version: number;
+}
+
+export type LessonEvent =
+  | { readonly type: 'STRIKE'; readonly band: PitchBand; readonly timeMs: number }
+  | { readonly type: 'TICK'; readonly timeMs: number }
+  | { readonly type: 'CALIBRATION_READY'; readonly timeMs: number };
+
+export const LEVEL_TITLES: Record<LessonLevel, string> = {
+  1: 'Single tones',
+  2: 'Tone words',
+  3: 'Greetings',
+};
+
+const NO_EFFECTS: readonly LessonEffect[] = [];
+const NO_STRIKES: readonly LessonStrike[] = [];
+
+/** Phrases per level in data-file order (config counts). `startId` jumps to that phrase. */
+export function buildSessionPlan(
+  entries: readonly LessonEntry[],
+  config: LessonConfig = APP_CONFIG.lesson,
+  startId?: string,
+): { plan: SessionPlan; levelIndex: number; phraseIndex: number } {
+  const levels: PlannedLevel[] = [];
+  for (const level of [1, 2, 3] as const) {
+    const phrases = entries
+      .filter((e) => e.level === level)
+      .slice(0, config.phrasesPerLevel[level]);
+    if (phrases.length > 0) {
+      levels.push({ level, phrases });
+    }
+  }
+  let levelIndex = 0;
+  let phraseIndex = 0;
+  const start = startId === undefined ? undefined : entries.find((e) => e.id === startId);
+  if (start !== undefined) {
+    levelIndex = levels.findIndex((l) => l.level === start.level);
+    const found = levels[levelIndex].phrases.findIndex((p) => p.id === start.id);
+    if (found >= 0) {
+      phraseIndex = found;
+    } else {
+      levels[levelIndex] = {
+        level: start.level,
+        phrases: [start, ...levels[levelIndex].phrases.slice(0, -1)],
+      };
+    }
+  }
+  return { plan: { levels }, levelIndex, phraseIndex };
+}
+
+export function evaluateAttempt(
+  target: readonly PitchBand[],
+  strikes: readonly LessonStrike[],
+): AttemptResult {
+  const perSyllable = target.map((tone, i) => strikes[i]?.band === tone);
+  const complete = strikes.length >= target.length;
+  return {
+    correct: complete && perSyllable.every(Boolean),
+    complete,
+    perSyllable,
+    played: strikes.map((s) => s.band),
+  };
+}
+
+/** 3 stars on the first try, 2 on the second, 1 on the third; never below 1 for a correct echo. */
+export function starsForCorrectTry(attempt: number, maxTries: number): number {
+  return Math.max(1, Math.min(3, maxTries + 1 - attempt));
+}
+
+export function createLessonState(levelIndex = 0, phraseIndex = 0, nowMs = 0): LessonState {
+  return {
+    phase: 'TITLE',
+    enteredAtMs: nowMs,
+    levelIndex,
+    phraseIndex,
+    attempt: 1,
+    strikes: NO_STRIKES,
+    lastStrikeMs: -Infinity,
+    cueAtMs: 0,
+    demoReason: null,
+    demoStartMs: 0,
+    demoEndsAtMs: 0,
+    lastResult: null,
+    feedback: null,
+    stars: {},
+    effects: NO_EFFECTS,
+    version: 0,
+  };
+}
+
+export function currentPhrase(state: LessonState, plan: SessionPlan): LessonEntry | null {
+  return plan.levels[state.levelIndex]?.phrases[state.phraseIndex] ?? null;
+}
+
+export function totalStars(state: LessonState): number {
+  let sum = 0;
+  for (const id in state.stars) {
+    sum += state.stars[id];
+  }
+  return sum;
+}
+
+export function maxStars(plan: SessionPlan): number {
+  return plan.levels.reduce((n, l) => n + l.phrases.length * 3, 0);
+}
+
+function next(state: LessonState, patch: Partial<LessonState>): LessonState {
+  return { ...state, effects: NO_EFFECTS, ...patch, version: state.version + 1 };
+}
+
+function startDemo(
+  state: LessonState,
+  plan: SessionPlan,
+  config: LessonConfig,
+  timeMs: number,
+  reason: DemoReason,
+  patch: Partial<LessonState> = {},
+): LessonState {
+  const base = { ...state, ...patch };
+  const phrase = currentPhrase(base, plan);
+  const tones = phrase?.tones ?? [];
+  return next(base, {
+    phase: 'DEMO',
+    enteredAtMs: timeMs,
+    demoReason: reason,
+    demoStartMs: timeMs + config.demoLeadInMs,
+    demoEndsAtMs: timeMs + config.demoLeadInMs + tones.length * config.syllableIntervalMs,
+    strikes: NO_STRIKES,
+    lastStrikeMs: -Infinity,
+    effects: [
+      {
+        type: 'PLAY_DEMO',
+        tones,
+        leadInMs: config.demoLeadInMs,
+        intervalMs: config.syllableIntervalMs,
+        reason,
+      },
+    ],
+  });
+}
+
+function advancePhrase(
+  state: LessonState,
+  plan: SessionPlan,
+  config: LessonConfig,
+  timeMs: number,
+  stars: Readonly<Record<string, number>>,
+): LessonState {
+  const level = plan.levels[state.levelIndex];
+  const nextIndex = state.phraseIndex + 1;
+  if (level !== undefined && nextIndex < level.phrases.length) {
+    return startDemo(state, plan, config, timeMs, 'first', {
+      phraseIndex: nextIndex,
+      attempt: 1,
+      lastResult: null,
+      feedback: null,
+      stars,
+    });
+  }
+  return next(state, { phase: 'LEVEL_COMPLETE', enteredAtMs: timeMs, stars, feedback: null });
+}
+
+export function reduceLesson(
+  state: LessonState,
+  event: LessonEvent,
+  plan: SessionPlan,
+  config: LessonConfig = APP_CONFIG.lesson,
+): LessonState {
+  const t = event.timeMs;
+  const phrase = currentPhrase(state, plan);
+
+  switch (state.phase) {
+    case 'TITLE':
+      return event.type === 'STRIKE'
+        ? next(state, { phase: 'CALIBRATION', enteredAtMs: t })
+        : state;
+
+    case 'CALIBRATION':
+      return event.type === 'CALIBRATION_READY'
+        ? next(state, { phase: 'LEVEL_INTRO', enteredAtMs: t })
+        : state;
+
+    case 'LEVEL_INTRO':
+      return event.type === 'TICK' && t - state.enteredAtMs >= config.levelIntroMs
+        ? startDemo(state, plan, config, t, 'first', {
+            attempt: 1,
+            lastResult: null,
+            feedback: null,
+          })
+        : state;
+
+    case 'DEMO':
+      if (event.type !== 'TICK' || t < state.demoEndsAtMs + config.postDemoPauseMs) {
+        return state;
+      }
+      if (state.demoReason === 'answer') {
+        const stars = { ...state.stars, [phrase?.id ?? '']: 0 };
+        return advancePhrase(state, plan, config, t, stars);
+      }
+      return next(state, {
+        phase: 'YOUR_TURN',
+        enteredAtMs: t,
+        cueAtMs: t,
+        strikes: NO_STRIKES,
+        lastStrikeMs: -Infinity,
+      });
+
+    case 'YOUR_TURN': {
+      const target = phrase?.tones ?? [];
+      if (event.type === 'STRIKE') {
+        const strikes = [...state.strikes, { band: event.band, timeMs: t }];
+        if (strikes.length >= target.length) {
+          return next(state, {
+            phase: 'EVALUATE',
+            enteredAtMs: t,
+            strikes,
+            lastStrikeMs: t,
+            lastResult: evaluateAttempt(target, strikes),
+          });
+        }
+        return next(state, { strikes, lastStrikeMs: t });
+      }
+      if (event.type !== 'TICK') {
+        return state;
+      }
+      if (state.strikes.length > 0 && t - state.lastStrikeMs >= config.attemptGapMs) {
+        return next(state, {
+          phase: 'EVALUATE',
+          enteredAtMs: t,
+          lastResult: evaluateAttempt(target, state.strikes),
+        });
+      }
+      if (state.strikes.length === 0 && t - state.cueAtMs >= config.idleReplayMs) {
+        return startDemo(state, plan, config, t, 'idle');
+      }
+      return state;
+    }
+
+    case 'EVALUATE': {
+      if (event.type !== 'TICK') {
+        return state;
+      }
+      if (state.lastResult?.correct === true) {
+        return next(state, {
+          phase: 'FEEDBACK',
+          enteredAtMs: t,
+          feedback: 'correct',
+          stars: {
+            ...state.stars,
+            [phrase?.id ?? '']: starsForCorrectTry(state.attempt, config.maxTries),
+          },
+        });
+      }
+      return next(state, {
+        phase: 'FEEDBACK',
+        enteredAtMs: t,
+        feedback: state.attempt >= config.maxTries ? 'answer' : 'retry',
+      });
+    }
+
+    case 'FEEDBACK':
+      if (event.type !== 'TICK' || t - state.enteredAtMs < config.feedbackMs) {
+        return state;
+      }
+      if (state.feedback === 'correct') {
+        return advancePhrase(state, plan, config, t, state.stars);
+      }
+      if (state.feedback === 'retry') {
+        return startDemo(state, plan, config, t, 'retry', { attempt: state.attempt + 1 });
+      }
+      return startDemo(state, plan, config, t, 'answer');
+
+    case 'LEVEL_COMPLETE':
+      if (event.type !== 'TICK' || t - state.enteredAtMs < config.levelCompleteMs) {
+        return state;
+      }
+      if (state.levelIndex + 1 < plan.levels.length) {
+        return next(state, {
+          phase: 'LEVEL_INTRO',
+          enteredAtMs: t,
+          levelIndex: state.levelIndex + 1,
+          phraseIndex: 0,
+          attempt: 1,
+          lastResult: null,
+        });
+      }
+      return next(state, { phase: 'END', enteredAtMs: t });
+
+    case 'END':
+      // A short guard so the strike that finished the last phrase cannot restart the session.
+      return event.type === 'STRIKE' && t - state.enteredAtMs >= config.feedbackMs
+        ? { ...createLessonState(0, 0, t), version: state.version + 1 }
+        : state;
+  }
+}
+
+/** Stars earned in one level (for LEVEL_COMPLETE). */
+export function levelStars(state: LessonState, plan: SessionPlan, levelIndex: number): number {
+  let sum = 0;
+  for (const p of plan.levels[levelIndex]?.phrases ?? []) {
+    sum += state.stars[p.id] ?? 0;
+  }
+  return sum;
+}
