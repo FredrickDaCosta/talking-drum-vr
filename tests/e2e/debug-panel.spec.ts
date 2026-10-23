@@ -108,6 +108,7 @@ test.describe('Talking Drum VR — P2d in-VR debug panel (IWER hands)', () => {
     expect(later.snapshot.calibration).toBe('skipped');
     expect(later.snapshot.lessonPhase).toBe('TITLE');
     expect(later.lines[4]).toBe('Hands|R TRACKED   L TRACKED');
+    expect(later.lines[9]).toBe('Session|-- / cap 8:30   not reached');
     // Placed low-right of the drum, turned to face the head, within 0.61 m of it.
     expect(later.facingDeg).toBeLessThan(2);
     const d = Math.hypot(
@@ -121,6 +122,10 @@ test.describe('Talking Drum VR — P2d in-VR debug panel (IWER hands)', () => {
     expect(await rightHandStrike(page)).toBe(true);
     await expect.poll(async () => (await panel(page)).lines[2]).toMatch(/^Strikes\|1 {3}last \d/);
     await expect.poll(async () => (await panel(page)).snapshot.lessonPhase).not.toBe('TITLE');
+    // The title strike starts the session clock shown against the soft cap.
+    await expect
+      .poll(async () => (await panel(page)).lines[9])
+      .toMatch(/^Session\|0:\d\d \/ cap 8:30 {3}not reached$/);
 
     if (EVIDENCE) {
       fs.mkdirSync(EVIDENCE, { recursive: true });
@@ -162,7 +167,7 @@ test.describe('Talking Drum VR — P2d in-VR debug panel (IWER hands)', () => {
     expect(await markCount(page)).toBe(1);
     const marks = await page.evaluate(() => window.__talkingDrumDebugPanel!.marks());
     expect(marks[0]).toMatchObject({ index: 1, strikeCount: 1 });
-    await expect.poll(async () => (await panel(page)).lines[9]).toMatch(/^Marks\|1 /);
+    await expect.poll(async () => (await panel(page)).lines[10]).toMatch(/^Marks\|1 /);
     expect((await panel(page)).visible).toBe(true);
 
     // Left index fingertip touch = hide.

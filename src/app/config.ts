@@ -193,6 +193,11 @@ export interface LessonConfig {
   readonly levelIntroMs: number;
   /** How long the level result stays up (milliseconds). */
   readonly levelCompleteMs: number;
+  /**
+   * Soft session cap from the title strike (ms; Infinity disables). Once passed, the phrase in
+   * progress finishes normally (retries and answer included), then the session goes to END.
+   */
+  readonly sessionCapMs: number;
   /** Phrases played per level (taken in data-file order); 'all' = every entry of that level. */
   readonly phrasesPerLevel: Readonly<Record<1 | 2 | 3, number | 'all'>>;
   /** content:validate fails if a level has fewer entries than this. */
@@ -385,6 +390,7 @@ export const APP_CONFIG: AppConfig = {
     feedbackMs: 2500,
     levelIntroMs: 3500,
     levelCompleteMs: 4000,
+    sessionCapMs: 510_000, // 8.5 min
     // 'all' plays every entry of that level in data-file order, so new entries need no code change.
     phrasesPerLevel: { 1: 'all', 2: 'all', 3: 'all' },
     minEntriesPerLevel: { 1: 8, 2: 12, 3: 4 },

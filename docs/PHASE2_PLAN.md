@@ -1,7 +1,7 @@
 # Phase 2 Plan: "Listen, then echo" (`docs/PHASE2_PLAN.md`)
 
-> **Status:** P2a (#25), P2b (#26) and P2c (#27) are merged and deployed. P2d (in-VR debug panel for the
-> Quest session) is in review.
+> **Status:** P2a (#25), P2b (#26), P2c (#27) and P2d (#28) are merged and deployed. The soft session cap
+> (§7) is CTO-approved.
 > Source: CTO design brief, 2026-10-23.
 
 ## 1. Game
@@ -405,3 +405,20 @@ borrowed-Quest session needs the key numbers inside VR.
   - fingertip touch reliability with real hand tracking (in IWER the fingertip is placed exactly)
   - Quest Browser `XRFrame.fillPoses` support for the touch check: if it is missing, touches do nothing but
     the panel still displays
+
+## 7. Soft session cap (CTO decision, 2026-10-23)
+
+- **Config:** `lesson.sessionCapMs` = 510 000 (8.5 min). The clock starts at the title strike (and again at a
+  restart strike). Setting `Infinity` disables the cap.
+- **When it applies:** it is checked only at phrase boundaries:
+  - after a phrase ends (correct, or after the answer)
+  - at the end of a level result
+  - before a level's first phrase
+    If the cap has passed, the session goes to END ("Session complete · time is up") instead of the next
+    phrase or level.
+- **Phrase in progress:** it always finishes normally, with all 3 tries and the answer if needed (unit-tested
+  for the cap passing mid-demo, mid-attempt and before a third failure).
+- **Worst case:** the longest possible session is now 8.5 min plus one phrase. That is about 0.6 min for a
+  four-syllable L3 phrase with three tries and the answer, so ≈9.1 min, inside the 10-minute limit.
+- **Debug panel:** the `Session` line shows `m:ss / cap 8:30` and `not reached`, `reached (finishing phrase)`
+  or `ended session`.
