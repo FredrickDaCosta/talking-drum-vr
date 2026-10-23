@@ -101,6 +101,68 @@ export interface XrInputNoticeConfig {
   readonly recheckIntervalMs: number;
 }
 
+export interface SqueezeConfig {
+  /**
+   * Default per-finger curl for an OPEN hand, in palm lengths (mean tip-to-own-knuckle distance of
+   * index..pinky divided by wrist-to-middle-knuckle distance). Used until calibration succeeds.
+   */
+  readonly defaultOpenCurl: number;
+  /** Default curl for a tight FIST, in palm lengths. */
+  readonly defaultFistCurl: number;
+  /** Calibration: open-minus-fist medians below this separation are rejected (palm lengths). */
+  readonly minCalibrationSeparation: number;
+  /** Calibration: plausible bounds for a captured median (palm lengths); outside means failed. */
+  readonly minPlausibleCurl: number;
+  readonly maxPlausibleCurl: number;
+  /** Calibration: duration of the "open your hand" and "make a fist" steps (milliseconds). */
+  readonly calibrationOpenMs: number;
+  readonly calibrationFistMs: number;
+  /** Calibration: samples in the first part of each step are ignored while the hand moves (milliseconds). */
+  readonly calibrationSettleMs: number;
+  /** Calibration: minimum valid samples per step (a robustness floor for the median, not a frame-rate proxy: ~10 fps headless gives ~15, a 72 Hz headset ~108). */
+  readonly minCalibrationSamples: number;
+  /** How long the result message ("calibrated" / "using defaults") stays on screen (milliseconds). */
+  readonly calibrationResultMessageMs: number;
+  /** Plausible palm length (wrist to middle knuckle) in meters; outside this the frame is rejected. */
+  readonly minPalmLengthMeters: number;
+  readonly maxPalmLengthMeters: number;
+  /** Minimum number of fingers (of index, middle, ring, pinky) with valid joints for a usable frame. */
+  readonly minValidFingers: number;
+  /** Hold the last squeeze this long when joints go missing, then fall back to neutral (milliseconds). */
+  readonly missingHoldMs: number;
+  /** Squeeze used when the squeeze hand is lost (0..1; 0.5 = mid pitch). */
+  readonly neutralSqueeze: number;
+  /** One Euro filter for the 0..1 squeeze value (units: squeeze per second). */
+  readonly filter: OneEuroFilterConfig;
+}
+
+export type PitchBand = 'L' | 'M' | 'H';
+
+export interface PitchConfig {
+  /** playbackRate at squeeze 0 (open hand). */
+  readonly lowRatio: number;
+  /** playbackRate at squeeze 0.5. */
+  readonly midRatio: number;
+  /** playbackRate at squeeze 1 (fist). */
+  readonly highRatio: number;
+  /** Squeeze below this is band L (before hysteresis). */
+  readonly lowBandMax: number;
+  /** Squeeze above this is band H (before hysteresis). */
+  readonly highBandMin: number;
+  /**
+   * Total hysteresis width around each band threshold: moving up needs threshold + h/2,
+   * moving down needs threshold - h/2.
+   */
+  readonly bandHysteresis: number;
+}
+
+export interface PitchLadderConfig {
+  /** Ladder base offset from the drum origin in world axes (meters); left of the drum for a left-hand squeeze. */
+  readonly offsetMeters: readonly [number, number, number];
+  /** Height of the ladder track (meters); squeeze 0 at the bottom, 1 at the top. */
+  readonly heightMeters: number;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -119,6 +181,9 @@ export interface AppConfig {
   readonly visualFilter: OneEuroFilterConfig;
   readonly audio: DrumAudioConfig;
   readonly xrInputNotice: XrInputNoticeConfig;
+  readonly squeeze: SqueezeConfig;
+  readonly pitch: PitchConfig;
+  readonly pitchLadder: PitchLadderConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -182,6 +247,42 @@ export const APP_CONFIG: AppConfig = {
   xrInputNotice: {
     handDetectionGraceMs: 3000,
     recheckIntervalMs: 250,
+  },
+  squeeze: {
+    defaultOpenCurl: 0.95,
+    defaultFistCurl: 0.35,
+    minCalibrationSeparation: 0.2,
+    minPlausibleCurl: 0.05,
+    maxPlausibleCurl: 1.6,
+    calibrationOpenMs: 2000,
+    calibrationFistMs: 2000,
+    calibrationSettleMs: 500,
+    minCalibrationSamples: 8,
+    calibrationResultMessageMs: 2500,
+    minPalmLengthMeters: 0.05,
+    maxPalmLengthMeters: 0.16,
+    minValidFingers: 2,
+    missingHoldMs: 250,
+    neutralSqueeze: 0.5,
+    filter: {
+      enabled: true,
+      minCutoffHz: 2.0,
+      beta: 0.6,
+      dCutoffHz: 1.0,
+      maxGapMs: 150,
+    },
+  },
+  pitch: {
+    lowRatio: 0.75,
+    midRatio: 1.0,
+    highRatio: 1.33,
+    lowBandMax: 0.33,
+    highBandMin: 0.67,
+    bandHysteresis: 0.04,
+  },
+  pitchLadder: {
+    offsetMeters: [-0.2, 0.05, 0.08],
+    heightMeters: 0.18,
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

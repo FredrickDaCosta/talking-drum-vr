@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Phase 2, step P2a (pitch-hand squeeze and pitch):**
+  - Squeeze 0..1 from the left hand's WebXR joints (`src/input/hand-squeeze.ts`): tip → own-knuckle curl
+    normalised by palm length, One Euro smoothing, and hold-then-neutral on dropouts.
+  - Guided open/fist calibration with median capture and sanity checks (`src/input/squeeze-calibration.ts`).
+    `?calib=0` skips it.
+  - Log pitch mapping 0.75–1.0–1.33 and L/M/H bands with hysteresis (`src/game/pitch-mapping.ts`). The
+    squeeze is latched on the strike frame and passed to `DrumAudio.play({ velocity, pitchRatio })`.
+  - In-world three-rung pitch ladder (`src/game/pitch-ladder-system.ts`) and a `?debug=1` HUD pitch line.
+  - `docs/PHASE2_PLAN.md`.
+- **Audio diagnostics and safe resume (#24):** `voices started` / `active`, max pipeline and max frame gap
+  over 5 s, skip counts by reason; `AudioContext` resume on statechange, visibility and XR session changes,
+  gated on a user gesture.
+
 ## [m1] - 2026-10-23 (Hands-Only Strike Detection & Drum Sound)
 
 ### Release Metadata

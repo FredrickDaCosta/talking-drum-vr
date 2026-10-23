@@ -131,3 +131,38 @@ Open `https://drum.da-costa.online/?xrfps=1&debug=1`, click **Enter VR**, and sw
 6. Switch the emulator back to controllers. After about 3 s, the status shows _"Only controllers are active — please put your controllers down and enable hand tracking to play the talking drum."_ It clears when hands return: `[ ___ ]`
 7. On first load, the "Loading Talking Drum VR…" banner appears briefly and then disappears: `[ ___ ]`
 8. Any red console errors: `[ ___ ]`
+
+### 3.3 P2a Squeeze and Pitch Checklist (Fredrick, after the P2a PR is deployed)
+
+Open `https://drum.da-costa.online/?xrfps=1&debug=1`. Switch the emulator to **hands** (toolbar
+input-mode icon) and click **Enter VR**. Watch the third HUD line (`pitch hand(left): …`) and the
+three-rung ladder to the left of the drum.
+
+1. **Calibration.** Keep the LEFT hand in the relaxed **default** pose. The status should show "Calibration
+   1/2: open your LEFT hand…".
+   - When it switches to "2/2: … FIST", select the **Point** pose for the left hand.
+   - Expected: "Calibrated…", and the HUD reads `calib done (open ≈0.89 / fist ≈0.58)`.
+   - Observed: `[ ___ ]`
+2. **Bands after calibration.**
+   - Left hand **Point** → `band H`, marker at the top, top rung lit.
+   - Left hand **default** → `band L`, marker at the bottom.
+   - **Pinch** (if offered) → close to L (it only bends the index finger and thumb).
+   - Observed: `[ ___ ]`
+3. **Strike with a pitch.** Hold the left hand in **Point** (H), then strike with the RIGHT hand.
+   - Expected: the tone sounds higher than with **default** (L).
+   - Expected: the HUD `last strike H 1.33 (squeeze 1.00, TRACKED)`, or close to it, and `voices started` goes up by 1.
+   - Observed: `[ ___ ]`
+4. **Defaults path.** Reload with `?debug=1&calib=0`.
+   - Expected: no calibration prompts, and the HUD reads `calib skipped`.
+   - Expected: default → `band L` (squeeze ≈0.11); Point → `band M` (squeeze ≈0.61).
+   - Observed: `[ ___ ]`
+5. **Left hand away.** Hide or remove the left hand, if the emulator allows it.
+   - Expected: `HELD`, then `LOST` within about 0.25 s; squeeze 0.50, band M, and the marker turns grey.
+   - Observed: `[ ___ ]`
+6. **Left hand never strikes.** Move the LEFT hand down through the drum head.
+   - Expected: `strikes` does not change.
+   - Observed: `[ ___ ]`
+7. **Console.** Any red errors? `[ ___ ]`
+
+**UNVERIFIED (Quest only):** a real fist, the curl range of real hands, comfort, and whether the default
+open/fist values and band thresholds feel right.

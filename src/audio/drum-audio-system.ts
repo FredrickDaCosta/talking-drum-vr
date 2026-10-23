@@ -6,6 +6,7 @@ import { DebugHud, type DebugHudAudioProbe } from '../debug/debug-hud.js';
 import { DEBUG_MAX_WINDOW_MS, frameTiming } from '../debug/frame-timing.js';
 import { RollingMaxWindow } from '../debug/rolling-max.js';
 import { StrikeSystem } from '../game/strike-system.js';
+import { latchPitchForStrike } from '../input/left-hand-pitch.js';
 import { drumAudio } from './audio-unlock.js';
 import type { DrumAudioDiagnostics } from './drum-audio.js';
 
@@ -52,7 +53,12 @@ export class DrumAudioSystem extends createSystem({
     void drumAudio.prepare();
 
     const unsubscribe = StrikeSystem.onStrike((event) => {
-      const outcome = drumAudio.play({ velocity: event.hit.speed }, event.frameEntryPerfNowMs);
+      // SqueezeSystem ran earlier this frame, so this latches the pitch hand at the strike frame.
+      const pitchRatio = latchPitchForStrike();
+      const outcome = drumAudio.play(
+        { velocity: event.hit.speed, pitchRatio },
+        event.frameEntryPerfNowMs,
+      );
       if (this.debugEnabled) {
         if (outcome === 'played') {
           this.pipelineWindow.push(
