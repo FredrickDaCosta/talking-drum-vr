@@ -247,6 +247,16 @@ export interface DebugPanelConfig {
   readonly markKey: string;
 }
 
+export interface DesktopConfig {
+  /** Strike speed (m/s) for a click / tap / Space strike, and for a soft (Shift) one. */
+  readonly strikeVelocityMps: number;
+  readonly softStrikeVelocityMps: number;
+  /** Band selected when desktop mode starts. */
+  readonly initialBand: PitchBand;
+  /** Rim points used to project the drum head onto the screen for the click test. */
+  readonly headOutlinePoints: number;
+}
+
 export interface DiagnosticsConfig {
   /** Refresh interval for the ?xrfps=1 FPS overlay (milliseconds). */
   readonly fpsUpdateIntervalMs: number;
@@ -271,6 +281,7 @@ export interface AppConfig {
   readonly lesson: LessonConfig;
   readonly lessonPanel: LessonPanelConfig;
   readonly debugPanel: DebugPanelConfig;
+  readonly desktop: DesktopConfig;
   readonly diagnostics: DiagnosticsConfig;
 }
 
@@ -411,15 +422,23 @@ export const APP_CONFIG: AppConfig = {
     offsetMeters: [0.3, 0.04, 0.16],
     widthMeters: 0.24,
     heightMeters: 0.18,
-    canvasWidthPx: 1024,
-    canvasHeightPx: 768,
-    textPx: 38,
+    // ~640 px across 0.24 m matches the Quest 3 display density at ~0.55 m (~25 px/deg); more
+    // pixels only cost upload time on each 4 Hz refresh.
+    canvasWidthPx: 640,
+    canvasHeightPx: 480,
+    textPx: 24,
     refreshHz: 4,
     touchDepthMeters: 0.03,
     touchRearmMs: 600,
     markCapacity: 32,
     toggleKey: 'Backquote',
     markKey: 'KeyM',
+  },
+  desktop: {
+    strikeVelocityMps: 1.6,
+    softStrikeVelocityMps: 0.6,
+    initialBand: 'M',
+    headOutlinePoints: 24,
   },
   diagnostics: {
     fpsUpdateIntervalMs: 250,

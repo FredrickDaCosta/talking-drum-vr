@@ -13,6 +13,7 @@ import {
 import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
 import { statusChannel } from './ui/status-channel.js';
+import { uiState } from './ui/ui-state.js';
 
 declare global {
   interface Window {
@@ -35,6 +36,8 @@ export class PanelSystem extends createSystem({
   private noticeMessage: string | null = null;
   private renderedMessage: string | null = null;
   private seenChannelVersion = -1;
+  private seenUiVersion = -1;
+  private applyWelcomePanel: () => void = () => {};
   /** For tests: whether the welcome panel is shown (it is hidden for the whole XR session). */
   private readonly uiDiag = { welcomePanelVisible: true };
 
@@ -52,12 +55,24 @@ export class PanelSystem extends createSystem({
     const xrButton = panel?.getElementById('xr-button');
     const exitButton = panel?.getElementById('exit-button');
     const panelStatusEl = panel?.getElementById<UIKit.Text>('vr-status');
-    const panelObjects = [panel, this.world.getSceneEntity('welcome-panel')?.object3D];
+    // In 2D, ScreenSpace re-parents the panel's document under the camera, so hide it too.
+    const panelObjects = [
+      panel,
+      panel?.document,
+      this.world.getSceneEntity('welcome-panel')?.object3D,
+    ];
     if (typeof window !== 'undefined') {
       window.__talkingDrumUi = this.uiDiag;
     }
     // In XR the lesson panel (LessonSystem) is the only panel: the welcome panel would sit behind
     // it, so it is hidden (and its buttons disabled) for the whole session and shown again in 2D.
+    // Desktop play also hides it: the lesson panel's title screen and the desktop overlay carry the
+    // instructions.
+    this.applyWelcomePanel = () =>
+      setWelcomePanelShown(
+        this.world.visibilityState.peek() === VisibilityState.NonImmersive &&
+          !uiState.desktopActive,
+      );
     const setWelcomePanelShown = (shown: boolean): void => {
       for (const obj of panelObjects) {
         if (obj != null) {
@@ -146,7 +161,7 @@ export class PanelSystem extends createSystem({
           // Exit is via the headset's system menu (or the 2D page button); no hidden hit target.
           exitButton.setProperties({ display: 'none' });
         }
-        setWelcomePanelShown(is2D);
+        this.applyWelcomePanel();
         if (domEnterBtn !== null) {
           domEnterBtn.textContent = is2D ? 'Enter VR' : 'Exit VR';
           domEnterBtn.setAttribute('aria-label', is2D ? 'Enter VR (Hand Tracking)' : 'Exit VR');
@@ -157,6 +172,10 @@ export class PanelSystem extends createSystem({
 
   update(delta: number): void {
     this.fpsOverlay?.update(delta);
+    if (uiState.version !== this.seenUiVersion) {
+      this.seenUiVersion = uiState.version;
+      this.applyWelcomePanel();
+    }
 
     const isImmersive = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
     if (isImmersive) {

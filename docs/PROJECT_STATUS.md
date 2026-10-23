@@ -7,12 +7,17 @@
 
 ## Current Stage
 
-**Phase 2, step P2d (in-VR debug panel): IN REVIEW** on branch `feat/p2d-debug-panel`. The PR is open; do
-NOT merge until the CTO approves. P2c was ACCEPTED and merged in #27 (`5831a6c`), then deployed (Deploy run
-40026236236, live smoke 14 passed). P2b merged in #26 (`ac4a7e1`), P2a in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
-diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
-`docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
-CTO/PM writes the task prompts and Fredrick relays them.
+**P3 desktop play mode: IN REVIEW** on branch `feat/p3-desktop-mode`. Do NOT merge until the CTO approves.
+
+- **Fix PR #30** (debug-panel refresh frame spike; `main` CI has been red since #28) is green and awaits CTO
+  approval. This branch includes its commit.
+- **Session cap PR #29** is CTO-approved and is merged by Claude Code once CI, CodeQL and the live smoke are
+  green, which needs #30 first.
+- **Merged:** P2d in #28 (`458b1e2`), P2c in #27 (`5831a6c`), P2b in #26 (`ac4a7e1`), P2a in #25
+  (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+  diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
+  `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
+  CTO/PM writes the task prompts and Fredrick relays them.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
@@ -113,11 +118,12 @@ CTO/PM writes the task prompts and Fredrick relays them.
       `docs/QUEST_TEST_PLAN.md`. See `docs/PHASE2_PLAN.md §5`.
 - [ ] Session length: ≈5.3 min at a normal pace (a model; UNVERIFIED). About 6 more L2 words or 5 more L3
       phrases from Fredrick would reach 6–8 min.
-- [x] P2d in review (`feat/p2d-debug-panel`): in-VR debug panel (`?debug=1` only) with fingertip mark / hide
+- [x] P2d merged (#28, `458b1e2`): in-VR debug panel (`?debug=1` only) with fingertip mark / hide
       controls; Quest plan updated to read it in VR; `phrasesPerLevel: 'all'`; `docs/CONTENT_ADDITIONS.md`.
-- [ ] Fredrick: send +4 L2 and +3 L3 entries (template in `docs/CONTENT_ADDITIONS.md`) to reach ≈6.9 min.
-- [ ] CTO decision: the all-misses worst case with that content is ≈12.7 min (> 10 min). Lower `maxTries` for
-      L3 or add a session time cap?
+- [x] CTO decision: a soft session cap of 8.5 min. Implemented in PR #29.
+- [x] P3 desktop play mode in review (`feat/p3-desktop-mode`; see `docs/DESKTOP_MODE.md`).
+- [ ] Fix PR #30: awaiting CTO approval.
+- [ ] First content batch (6 L2 words + 3 L3 phrases) from the CTO; Claude Code adds no Yoruba of its own.
 - [ ] Fredrick: run `docs/QUEST_TEST_PLAN.md` on a borrowed Quest and send back the results table.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 
