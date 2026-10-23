@@ -145,7 +145,7 @@ export function buildLessonView(
       const max = maxStars(plan);
       return {
         ...empty,
-        header: 'Session complete',
+        header: state.capped ? 'Session complete  ·  time is up' : 'Session complete',
         status: endMessage(earned, max),
         detail: PLAY_AGAIN_PROMPT,
         stars: { earned, max },

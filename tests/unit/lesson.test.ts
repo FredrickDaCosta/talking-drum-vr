@@ -51,7 +51,12 @@ const FIXTURE: LessonEntry[] = [
   entry('b', 1, ['H', 'L']),
   entry('c', 2, ['L', 'H']),
 ];
-const fixtureConfig: LessonConfig = { ...cfg, phrasesPerLevel: { 1: 2, 2: 1, 3: 4 } };
+// The soft session cap has its own tests below; the flow tests use large times, so it is off here.
+const fixtureConfig: LessonConfig = {
+  ...cfg,
+  phrasesPerLevel: { 1: 2, 2: 1, 3: 4 },
+  sessionCapMs: Infinity,
+};
 const plan: SessionPlan = buildSessionPlan(FIXTURE, fixtureConfig).plan;
 
 const tick = (timeMs: number): LessonEvent => ({ type: 'TICK', timeMs });
@@ -612,5 +617,126 @@ describe('content additions (no code change needed)', () => {
     expect(l2For6).toBeGreaterThan(0);
     expect(mix).toBeGreaterThan(6);
     expect(mix).toBeLessThan(8);
+  });
+});
+
+describe('soft session cap', () => {
+  const capCfg = (sessionCapMs: number): LessonConfig => ({ ...fixtureConfig, sessionCapMs });
+  const run = (s: LessonState, e: LessonEvent, c: LessonConfig) => reduceLesson(s, e, plan, c);
+
+  /** TITLE strike at t=0 -> first YOUR_TURN for phrase a, under config c. */
+  function firstTurn(c: LessonConfig): LessonState {
+    let s = run(createLessonState(), strike('M', 0), c);
+    s = run(s, { type: 'CALIBRATION_READY', timeMs: 0 }, c);
+    s = run(s, tick(c.levelIntroMs), c);
+    return run(s, tick(s.demoEndsAtMs + c.postDemoPauseMs), c);
+  }
+
+  it('is 8.5 minutes by default, counted from the title strike', () => {
+    expect(APP_CONFIG.lesson.sessionCapMs).toBe(510_000);
+    const s = run(createLessonState(0, 0, 0), strike('M', 1234), cfg);
+    expect(s.sessionStartMs).toBe(1234);
+    expect(s.capped).toBe(false);
+    expect(Number.isNaN(createLessonState().sessionStartMs)).toBe(true);
+  });
+
+  it('cap passing mid-demo: the demo, the echo and the feedback still finish, then END', () => {
+    const c = capCfg(cfg.levelIntroMs + 100); // passes during the first demo
+    let s = run(createLessonState(), strike('M', 0), c);
+    s = run(s, { type: 'CALIBRATION_READY', timeMs: 0 }, c);
+    s = run(s, tick(c.levelIntroMs), c);
+    expect(s.phase).toBe('DEMO');
+    s = run(s, tick(s.demoEndsAtMs + c.postDemoPauseMs), c); // past the cap
+    expect(s.phase).toBe('YOUR_TURN');
+    s = run(s, strike('M', s.cueAtMs + 100), c);
+    s = run(s, tick(s.enteredAtMs + 1), c);
+    expect(s).toMatchObject({ phase: 'FEEDBACK', feedback: 'correct', stars: { a: 3 } });
+    s = run(s, tick(s.enteredAtMs + c.feedbackMs), c);
+    expect(s).toMatchObject({ phase: 'END', capped: true, stars: { a: 3 } });
+  });
+
+  it('cap passing mid-attempt: retries continue until the phrase ends, then END', () => {
+    const c = capCfg(cfg.levelIntroMs + 1); // passes just after the first phrase starts
+    let s = firstTurn(c); // already past the cap at "Your turn"
+    s = run(s, strike('L', s.cueAtMs + 100), c); // wrong
+    s = run(s, tick(s.enteredAtMs + 1), c);
+    expect(s.feedback).toBe('retry');
+    s = run(s, tick(s.enteredAtMs + cfg.feedbackMs), c);
+    expect(s).toMatchObject({ phase: 'DEMO', demoReason: 'retry', attempt: 2 }); // not END
+    s = run(s, tick(s.demoEndsAtMs + cfg.postDemoPauseMs), c);
+    s = run(s, strike('M', s.cueAtMs + 100), c);
+    s = run(s, tick(s.enteredAtMs + 1), c);
+    s = run(s, tick(s.enteredAtMs + cfg.feedbackMs), c);
+    expect(s).toMatchObject({ phase: 'END', capped: true, stars: { a: 2 } });
+  });
+
+  it('cap passing before the third failure: the answer is played, then END with 0 stars', () => {
+    const c = capCfg(cfg.levelIntroMs + 1);
+    let s = firstTurn(c);
+    for (let i = 0; i < 3; i += 1) {
+      s = run(s, strike('H', s.cueAtMs + 100), c);
+      s = run(s, tick(s.enteredAtMs + 1), c);
+      s = run(s, tick(s.enteredAtMs + cfg.feedbackMs), c);
+      if (i < 2) {
+        s = run(s, tick(s.demoEndsAtMs + cfg.postDemoPauseMs), c);
+      }
+    }
+    expect(s).toMatchObject({ phase: 'DEMO', demoReason: 'answer' });
+    s = run(s, tick(s.demoEndsAtMs + cfg.postDemoPauseMs), c);
+    expect(s).toMatchObject({ phase: 'END', capped: true, stars: { a: 0 } });
+  });
+
+  it('cap passing during a level result or a level intro goes to END instead of the next level', () => {
+    const atComplete: LessonState = {
+      ...createLessonState(),
+      phase: 'LEVEL_COMPLETE',
+      sessionStartMs: 0,
+      enteredAtMs: 600_000,
+    };
+    const fromComplete = run(atComplete, tick(600_000 + cfg.levelCompleteMs), cfg);
+    expect(fromComplete).toMatchObject({ phase: 'END', capped: true });
+    const atIntro: LessonState = {
+      ...createLessonState(1, 0),
+      phase: 'LEVEL_INTRO',
+      sessionStartMs: 0,
+      enteredAtMs: 600_000,
+    };
+    expect(run(atIntro, tick(600_000 + cfg.levelIntroMs), cfg)).toMatchObject({
+      phase: 'END',
+      capped: true,
+    });
+    // Before the cap the next level starts as usual.
+    const early = { ...atComplete, enteredAtMs: 1000 };
+    expect(run(early, tick(1000 + cfg.levelCompleteMs), cfg).phase).toBe('LEVEL_INTRO');
+  });
+
+  it('a restart after a capped END starts a fresh clock; Infinity disables the cap', () => {
+    const end: LessonState = {
+      ...createLessonState(),
+      phase: 'END',
+      capped: true,
+      sessionStartMs: 0,
+      enteredAtMs: 520_000,
+    };
+    const again = run(end, strike('M', 520_000 + cfg.feedbackMs), cfg);
+    expect(again).toMatchObject({ phase: 'LEVEL_INTRO', capped: false });
+    expect(again.sessionStartMs).toBe(520_000 + cfg.feedbackMs);
+
+    const atComplete: LessonState = {
+      ...createLessonState(),
+      phase: 'LEVEL_COMPLETE',
+      sessionStartMs: 0,
+      enteredAtMs: 10_000_000,
+    };
+    expect(run(atComplete, tick(10_000_000 + cfg.levelCompleteMs), capCfg(Infinity)).phase).toBe(
+      'LEVEL_INTRO',
+    );
+  });
+
+  it('marks the END screen when the cap ended the session', () => {
+    const end: LessonState = { ...createLessonState(), phase: 'END', capped: true };
+    expect(buildLessonView(end, plan, { calibrationPrompt: null, demoIndex: -1 }).header).toBe(
+      'Session complete  ·  time is up',
+    );
   });
 });

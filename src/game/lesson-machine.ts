@@ -85,6 +85,10 @@ export interface LessonState {
   readonly effects: readonly LessonEffect[];
   /** Increments on every transition. */
   readonly version: number;
+  /** When the session started (the title strike, or the restart strike); NaN before that. */
+  readonly sessionStartMs: number;
+  /** True once the soft session cap ended the session early (END reached because of it). */
+  readonly capped: boolean;
 }
 
 export type LessonEvent =
@@ -177,6 +181,8 @@ export function createLessonState(levelIndex = 0, phraseIndex = 0, nowMs = 0): L
     stars: {},
     effects: NO_EFFECTS,
     version: 0,
+    sessionStartMs: Number.NaN,
+    capped: false,
   };
 }
 
@@ -231,6 +237,19 @@ function startDemo(
   });
 }
 
+/**
+ * Soft session cap: true once `sessionCapMs` has passed since the title strike. It is checked only
+ * at phrase boundaries (after a phrase ends, after a level result, before a level's first phrase),
+ * so a phrase in progress, including its retries and the answer, always finishes normally first.
+ */
+export function capReached(state: LessonState, config: LessonConfig, timeMs: number): boolean {
+  return (
+    Number.isFinite(config.sessionCapMs) &&
+    Number.isFinite(state.sessionStartMs) &&
+    timeMs - state.sessionStartMs >= config.sessionCapMs
+  );
+}
+
 function advancePhrase(
   state: LessonState,
   plan: SessionPlan,
@@ -238,6 +257,9 @@ function advancePhrase(
   timeMs: number,
   stars: Readonly<Record<string, number>>,
 ): LessonState {
+  if (capReached(state, config, timeMs)) {
+    return next(state, { phase: 'END', enteredAtMs: timeMs, stars, feedback: null, capped: true });
+  }
   const level = plan.levels[state.levelIndex];
   const nextIndex = state.phraseIndex + 1;
   if (level !== undefined && nextIndex < level.phrases.length) {
@@ -274,7 +296,7 @@ export function reduceLesson(
   switch (state.phase) {
     case 'TITLE':
       return event.type === 'STRIKE'
-        ? next(state, { phase: 'CALIBRATION', enteredAtMs: t })
+        ? next(state, { phase: 'CALIBRATION', enteredAtMs: t, sessionStartMs: t })
         : state;
 
     case 'CALIBRATION':
@@ -283,13 +305,17 @@ export function reduceLesson(
         : state;
 
     case 'LEVEL_INTRO':
-      return event.type === 'TICK' && t - state.enteredAtMs >= config.levelIntroMs
-        ? startDemo(state, plan, config, t, 'first', {
-            attempt: 1,
-            lastResult: null,
-            feedback: null,
-          })
-        : state;
+      if (event.type !== 'TICK' || t - state.enteredAtMs < config.levelIntroMs) {
+        return state;
+      }
+      if (capReached(state, config, t)) {
+        return next(state, { phase: 'END', enteredAtMs: t, capped: true });
+      }
+      return startDemo(state, plan, config, t, 'first', {
+        attempt: 1,
+        lastResult: null,
+        feedback: null,
+      });
 
     case 'DEMO':
       if (event.type !== 'TICK' || t < state.demoEndsAtMs + config.postDemoPauseMs) {
@@ -378,6 +404,9 @@ export function reduceLesson(
       if (event.type !== 'TICK' || t - state.enteredAtMs < config.levelCompleteMs) {
         return state;
       }
+      if (capReached(state, config, t)) {
+        return next(state, { phase: 'END', enteredAtMs: t, capped: true });
+      }
       if (state.levelIndex + 1 < plan.levels.length) {
         return next(state, {
           phase: 'LEVEL_INTRO',
@@ -394,7 +423,12 @@ export function reduceLesson(
       // "Strike the drum to play again": a fresh session from the first level, straight to the
       // level intro (calibration is kept). A short guard stops the last echo from restarting it.
       return event.type === 'STRIKE' && t - state.enteredAtMs >= config.feedbackMs
-        ? { ...createLessonState(0, 0, t), phase: 'LEVEL_INTRO', version: state.version + 1 }
+        ? {
+            ...createLessonState(0, 0, t),
+            phase: 'LEVEL_INTRO',
+            sessionStartMs: t,
+            version: state.version + 1,
+          }
         : state;
   }
 }

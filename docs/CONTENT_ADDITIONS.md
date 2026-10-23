@@ -15,13 +15,13 @@ The session model (`src/game/session-estimate.ts`) is printed by the unit tests.
 | ≥ 7 min                        | +9                    | +7                           | —                         |
 | **Suggested:** +4 L2 and +3 L3 | —                     | —                            | **6.9 min** (unit-tested) |
 
-**Caution:** with the suggested additions, a player who needs all three tries on **every** phrase would take
-about 12.7 min (today: 9.9 min), which is over the 10-minute limit. Typical play stays in 6–8 min.
+**Worst case:** a player who needed all three tries on every phrase would take about 12.7 min with the
+suggested additions. The **soft session cap** (8.5 min, `lesson.sessionCapMs`, CTO decision 2026-10-23)
+bounds this: the phrase in progress finishes, then the session ends. The longest possible session is therefore
+≈9.1 min.
 
-If you want a hard guarantee, these are config changes; nothing is changed yet:
-
-- lower `lesson.maxTries` for level 3, or
-- add a session time cap that skips to the end screen.
+**Next batch:** Fredrick is verifying 6 level-2 words and 3 level-3 phrases; the CTO will send them. The
+model's "≥ 6 min" row needs +4 L2 or +3 L3, so that batch is enough.
 
 ## 2. Nothing in the code needs to change
 

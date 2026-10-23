@@ -32,6 +32,11 @@ export interface VrDebugSnapshot {
   lessonPhase: string;
   lessonLevel: number;
   phraseId: string;
+  /** Seconds since the title strike (NaN before it), the soft cap (s), and whether it ended the session. */
+  sessionElapsedSec: number;
+  sessionCapSec: number;
+  capReached: boolean;
+  capped: boolean;
 }
 
 export function createVrDebugSnapshot(): VrDebugSnapshot {
@@ -62,6 +67,10 @@ export function createVrDebugSnapshot(): VrDebugSnapshot {
     lessonPhase: '-',
     lessonLevel: 0,
     phraseId: '',
+    sessionElapsedSec: Number.NaN,
+    sessionCapSec: Number.NaN,
+    capReached: false,
+    capped: false,
   };
 }
 
@@ -78,7 +87,16 @@ function markText(mark: DebugMark | null): string {
 }
 
 /** Number of text lines the panel draws (constant, so the layout never moves). */
-export const VR_DEBUG_LINE_COUNT = 12;
+export const VR_DEBUG_LINE_COUNT = 13;
+
+/** m:ss for a duration in seconds, or "--". */
+export function minSec(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '--';
+  }
+  const whole = Math.floor(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+}
 
 /**
  * Writes the panel's text lines into `lines` (length VR_DEBUG_LINE_COUNT). Each line is a
@@ -95,8 +113,14 @@ export function formatVrDebugLines(s: VrDebugSnapshot, marks: MarkLog, lines: st
   lines[6] = `Calib|${s.calibration}   open ${num(s.openCurl, 2)}   fist ${num(s.fistCurl, 2)}`;
   lines[7] = `Audio|${s.audioState}   skip nc ${s.skippedNoContext} nr ${s.skippedNotRunning} nb ${s.skippedNoBuffer} inv ${s.skippedInvalid}`;
   lines[8] = `Lesson|${s.lessonPhase}   L${s.lessonLevel}   ${s.phraseId || '-'}`;
-  lines[9] = `Marks|${marks.count}   (touch panel: R = mark, L = hide)`;
-  lines[10] = `|${markText(marks.newest(0))}`;
-  lines[11] = `|${markText(marks.newest(1))}`;
+  const capState = s.capped
+    ? 'ended session'
+    : s.capReached
+      ? 'reached (finishing phrase)'
+      : 'not reached';
+  lines[9] = `Session|${minSec(s.sessionElapsedSec)} / cap ${minSec(s.sessionCapSec)}   ${capState}`;
+  lines[10] = `Marks|${marks.count}   (touch panel: R = mark, L = hide)`;
+  lines[11] = `|${markText(marks.newest(0))}`;
+  lines[12] = `|${markText(marks.newest(1))}`;
   return lines;
 }

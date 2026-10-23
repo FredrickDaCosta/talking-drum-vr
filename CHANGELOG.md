@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Soft session cap** (`lesson.sessionCapMs`, 8.5 min from the title strike): once it passes, the phrase in
+  progress finishes normally, then the session goes to END. The debug panel shows the elapsed time and the
+  cap state.
 - **Phase 2, step P2d (in-VR debug panel, `?debug=1` only):**
   - A panel low and right of the drum, facing the player. It shows FPS and frame times, frame gap, strikes,
     pipeline and audio latency, hand states, squeeze, band, pitch, calibration, audio skips, lesson step and
