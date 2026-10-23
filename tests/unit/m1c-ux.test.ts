@@ -142,9 +142,13 @@ describe('debug HUD audio probe line', () => {
     const text = formatAudioProbe({
       contextState: 'running',
       voicesStartedCount: 1,
+      activeVoices: 1,
       lastSoftwarePipelineMs: 0.4231,
+      maxPipelineMs5s: 0.9,
+      maxFrameGapMs5s: 183.25,
       baseLatencyMs: 5.333,
       outputLatencyMs: Number.NaN,
+      skipped: { noContext: 2, contextNotRunning: 1, bufferNotReady: 0, invalidVelocity: 0 },
     });
     expect(text.startsWith(AUDIO_PROBE_LABEL)).toBe(true);
     expect(text).toContain('not tracking / end-to-end latency');
@@ -152,6 +156,11 @@ describe('debug HUD audio probe line', () => {
     expect(text).toContain('base 5.3 ms');
     expect(text).toContain('out n/a');
     expect(text).toContain('audio running');
-    expect(text).toContain('voices 1');
+    expect(text).toContain('max pipeline (5 s) 0.90 ms');
+    expect(text).toContain('max frame gap (5 s) 183.3 ms');
+    expect(text).toContain('voices started 1');
+    expect(text).toContain('active 1');
+    expect(text).toContain('skipped no-context 2 / not-running 1 / no-buffer 0 / invalid 0');
+    expect(text).not.toMatch(/\| voices \d/);
   });
 });
