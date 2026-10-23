@@ -1,5 +1,6 @@
 import type { Handedness } from '../app/config.js';
 import type { HandTrackingQuality } from '../input/hand-tracker.js';
+import type { PitchHandState } from '../input/left-hand-pitch.js';
 
 export interface DebugHudTelemetry {
   handedness: Handedness;
@@ -57,6 +58,25 @@ export function formatAudioProbe(probe: DebugHudAudioProbe): string {
   );
 }
 
+function fixed(v: number, digits: number): string {
+  return Number.isFinite(v) ? v.toFixed(digits) : 'n/a';
+}
+
+/** Debug-only pitch-hand line: tracking, squeeze, band, pitch ratio, calibration, last latched strike. */
+export function formatPitchProbe(p: PitchHandState): string {
+  const calib =
+    p.calibration === 'done'
+      ? `calib done (open ${fixed(p.calibrationOpenCurl, 2)} / fist ${fixed(p.calibrationFistCurl, 2)})`
+      : p.calibration === 'failed'
+        ? `calib failed: ${p.calibrationFailureReason} (defaults)`
+        : `calib ${p.calibration}`;
+  const last =
+    p.latchedBand === 'none'
+      ? 'none'
+      : `${p.latchedBand} ${fixed(p.latchedPitchRatio, 2)} (squeeze ${fixed(p.latchedSqueeze, 2)}, ${p.latchedTracking})`;
+  return `pitch hand(${p.hand}): ${p.tracking} | squeeze ${fixed(p.squeeze, 2)} (curl ${fixed(p.rawCurl, 2)}) | band ${p.band} | pitch ${fixed(p.pitchRatio, 2)} | ${calib} | last strike ${last}`;
+}
+
 function formatSignedMeters(meters: number): string {
   if (!Number.isFinite(meters)) {
     return 'n/a';
@@ -80,6 +100,8 @@ export class DebugHud {
   private mainLine: HTMLDivElement | null = null;
   private audioLine: HTMLDivElement | null = null;
   private lastAudioText = '';
+  private pitchLine: HTMLDivElement | null = null;
+  private lastPitchText = '';
   private readonly throttleIntervalMs: number;
   private lastWriteTimestampMs = -Infinity;
   private lastRenderedStrikeCount = -1;
@@ -121,7 +143,10 @@ export class DebugHud {
     mainLine.dataset.testid = 'debug-hud-main';
     const audioLine = document.createElement('div');
     audioLine.dataset.testid = 'debug-hud-audio';
-    el.append(mainLine, audioLine);
+    const pitchLine = document.createElement('div');
+    pitchLine.dataset.testid = 'debug-hud-pitch';
+    el.append(mainLine, audioLine, pitchLine);
+    this.pitchLine = pitchLine;
     parent.appendChild(el);
     this.element = el;
     this.mainLine = mainLine;
@@ -177,6 +202,17 @@ export class DebugHud {
     this.lastRenderedHandState = telemetry.handState;
   }
 
+  updatePitchProbe(state: PitchHandState): void {
+    if (this.pitchLine === null) {
+      return;
+    }
+    const nextText = formatPitchProbe(state);
+    if (nextText !== this.lastPitchText) {
+      this.pitchLine.textContent = nextText;
+      this.lastPitchText = nextText;
+    }
+  }
+
   updateAudioProbe(probe: DebugHudAudioProbe): void {
     if (this.audioLine === null) {
       return;
@@ -201,6 +237,8 @@ export class DebugHud {
       this.element = null;
       this.mainLine = null;
       this.audioLine = null;
+      this.pitchLine = null;
+      this.lastPitchText = '';
       this.lastText = '';
       this.lastAudioText = '';
       if (DebugHud.active === this) {

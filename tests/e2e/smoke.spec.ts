@@ -287,7 +287,8 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     });
 
     const separator = targetUrl.includes('?') ? '&' : '?';
-    const flaggedUrl = `${targetUrl}${separator}debug=1`;
+    // calib=0: this is the strike test; squeeze calibration has its own e2e (squeeze.spec.ts).
+    const flaggedUrl = `${targetUrl}${separator}debug=1&calib=0`;
 
     const response = await page.goto(flaggedUrl, { waitUntil: 'networkidle' });
     expect(response?.status()).toBeLessThan(400);
@@ -422,6 +423,7 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
       const countAfterFastStrike = Number(hudEl.dataset.strikeCount ?? '0');
       const hudTextAfterFastStrike = hudEl.textContent ?? '';
       const audioAfterFastStrike = { ...window.__talkingDrumAudio! };
+      const pitchAfterFastStrike = { ...window.__talkingDrumPitch! };
       const audioProbeTextAfterFastStrike =
         document.querySelector('[data-testid="debug-hud-audio"]')?.textContent ?? '';
 
@@ -475,6 +477,7 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
         audioAfterFastStrike,
         audioProbeTextAfterFastStrike,
         voicesAtEnd: window.__talkingDrumAudio?.voicesStartedCount ?? -1,
+        pitchAfterFastStrike,
         countBeforeFastStrike,
         countAfterFastStrike,
         countAfterSlowDescent,
@@ -508,7 +511,14 @@ test.describe('Talking Drum VR — Smoke & XR E2E Suite', () => {
     expect(strikeResults.audioAfterFastStrike.contextState).toBe('running');
     expect(strikeResults.audioAfterFastStrike.voicesStartedCount).toBe(1);
     expect(strikeResults.audioAfterFastStrike.lastOutcome).toBe('played');
-    expect(strikeResults.audioAfterFastStrike.lastPlaybackRate).toBe(1);
+    // The strike plays at the pitch-hand ratio latched on the strike frame (P2a), within 0.75..1.33.
+    expect(strikeResults.pitchAfterFastStrike.strikesLatched).toBe(1);
+    expect(strikeResults.audioAfterFastStrike.lastPlaybackRate).toBeCloseTo(
+      strikeResults.pitchAfterFastStrike.latchedPitchRatio,
+      9,
+    );
+    expect(strikeResults.audioAfterFastStrike.lastPlaybackRate).toBeGreaterThanOrEqual(0.75);
+    expect(strikeResults.audioAfterFastStrike.lastPlaybackRate).toBeLessThanOrEqual(1.33);
     expect(strikeResults.audioAfterFastStrike.lastGain).toBeGreaterThanOrEqual(0.15);
     expect(strikeResults.audioAfterFastStrike.lastGain).toBeLessThanOrEqual(1);
     expect(Number.isFinite(strikeResults.audioAfterFastStrike.lastSoftwarePipelineMs)).toBe(true);

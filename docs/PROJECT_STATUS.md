@@ -7,9 +7,11 @@
 
 ## Current Stage
 
-**M1 CLOSED** (tag `m1`, 2026-10-23). **Next stage: Phase 2, waiting for the CTO's design brief. Do not
-start Phase 2 work before it arrives.** Implementation was handed from Antigravity to Claude Code (cloud
-session); the CTO/PM writes the task prompts. Fredrick relays them.
+**Phase 2, step P2a (squeeze and pitch): IN REVIEW** on branch `feat/p2a-squeeze-pitch`. The PR is open;
+do NOT merge until the CTO approves. M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
+`docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
+CTO/PM writes the task prompts and Fredrick relays them.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
@@ -92,6 +94,17 @@ session); the CTO/PM writes the task prompts. Fredrick relays them.
       Close them, or add ignore rules? Do not merge without approval.
 - Note: Dependabot does not check the aliased `three` (`npm:super-three`), so three updates are manual.
 - E2E flake: root-caused and handled in M1c (see the M1c section above).
+
+### Phase 2 (see `docs/PHASE2_PLAN.md`)
+
+- [x] P2a in review: pitch-hand squeeze (tip → own-knuckle curl / palm length), guided open/fist
+      calibration (`?calib=0` skips it), log pitch mapping 0.75–1.0–1.33, L/M/H bands with hysteresis,
+      strike-frame latch into `DrumAudio.play({ velocity, pitchRatio })`, pitch ladder, debug HUD pitch line.
+- [ ] Fredrick: P2a emulator checklist (`docs/TEST_PLAN.md §3.3`) after deploy.
+- [ ] P2b: lesson engine and content (typed data file, `content:validate`, `reviewStatus`, diacritics;
+      content from Fredrick only).
+- [ ] P2c: onboarding, end screen, polish.
+- [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 
 ### Open Items After M1 (owner in brackets)
 

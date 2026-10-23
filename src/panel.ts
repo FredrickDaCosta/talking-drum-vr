@@ -12,6 +12,7 @@ import {
 } from './platform/xr-input-notice.js';
 import { requestImmersiveVrSession } from './platform/xr-launch.js';
 import { FpsOverlay } from './ui/fps-overlay.js';
+import { statusChannel } from './ui/status-channel.js';
 
 export class PanelSystem extends createSystem({
   drums: { required: [TalkingDrum] },
@@ -25,6 +26,9 @@ export class PanelSystem extends createSystem({
   private lastInputCheckMs = -Infinity;
   private inputNoticeState: XrInputNoticeState = 'pending';
   private setStatusMessage: (message: string | null) => void = () => {};
+  private noticeMessage: string | null = null;
+  private renderedMessage: string | null = null;
+  private seenChannelVersion = -1;
 
   init(): void {
     const flags = getAppFlags();
@@ -102,7 +106,7 @@ export class PanelSystem extends createSystem({
         const is2D = visibilityState === VisibilityState.NonImmersive;
         if (is2D) {
           this.calibratedInSession = false;
-          if (xrInputNoticeMessage(this.inputNoticeState) !== null) {
+          if (this.renderedMessage !== null) {
             updateStatusMessage(null);
           }
         } else {
@@ -112,6 +116,8 @@ export class PanelSystem extends createSystem({
           this.lastInputCheckMs = -Infinity;
         }
         this.inputNoticeState = 'pending';
+        this.noticeMessage = null;
+        this.renderedMessage = null;
         if (xrButton != null && exitButton != null && this.world.xrEnabled) {
           xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
           exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
@@ -130,6 +136,10 @@ export class PanelSystem extends createSystem({
     const isImmersive = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
     if (isImmersive) {
       this.updateInputNotice();
+      if (statusChannel.version !== this.seenChannelVersion) {
+        this.seenChannelVersion = statusChannel.version;
+        this.renderStatus();
+      }
     }
     if (isImmersive && !this.calibratedInSession) {
       this.player.head.updateWorldMatrix(true, false);
@@ -173,10 +183,16 @@ export class PanelSystem extends createSystem({
     if (next === this.inputNoticeState) {
       return;
     }
-    const wasShowing = xrInputNoticeMessage(this.inputNoticeState) !== null;
     this.inputNoticeState = next;
-    const message = xrInputNoticeMessage(next);
-    if (message !== null || wasShowing) {
+    this.noticeMessage = xrInputNoticeMessage(next);
+    this.renderStatus();
+  }
+
+  /** Shows the calibration prompt if there is one, otherwise the hands-required notice. */
+  private renderStatus(): void {
+    const message = statusChannel.calibrationPrompt ?? this.noticeMessage;
+    if (message !== this.renderedMessage) {
+      this.renderedMessage = message;
       this.setStatusMessage(message);
     }
   }
