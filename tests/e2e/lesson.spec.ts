@@ -74,7 +74,14 @@ test.describe('Talking Drum VR — P2b lesson (IWER hands)', () => {
       .toBe('loaded');
 
     // Each pair: the NFC (precomposed where Unicode has one) form, then a fully decomposed form.
-    const pairs = ['ẹ ọ ṣ Ẹ Ọ Ṣ', 'à á è é ì í ò ó ù ú', 'ọ́ ọ̀ ẹ́ ẹ̀ Ọ́ Ẹ̀', 'Ẹ káàbọ̀ · Ó dàbọ̀ · ọ̀kọ̀'];
+    const pairs = [
+      'ẹ ọ ṣ Ẹ Ọ Ṣ',
+      'à á è é ì í ò ó ù ú',
+      'ọ́ ọ̀ ẹ́ ẹ̀ Ọ́ Ẹ̀',
+      'Ẹ káàbọ̀ · Ó dàbọ̀ · ọ̀kọ̀',
+      'ọ̀bẹ · ọbẹ̀ · ilé · ilẹ̀ · ìlú · ọ̀rọ̀',
+      'Ẹ kú iṣẹ́ · Ẹ jọ̀ọ́ · Ẹ pẹ̀lẹ́',
+    ];
     const result = await page.evaluate((nfcLines) => {
       const panel = window.__talkingDrumLessonPanel!;
       const nfd = nfcLines.map((l) => l.normalize('NFD'));

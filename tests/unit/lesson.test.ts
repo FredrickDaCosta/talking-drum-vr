@@ -194,19 +194,20 @@ describe('buildSessionPlan', () => {
     const { plan: full, levelIndex, phraseIndex } = buildSessionPlan(LESSONS, cfg);
     expect(full.levels.map((l) => [l.level, l.phrases.length])).toEqual([
       [1, 8],
-      [2, 12],
-      [3, 4],
+      [2, 18],
+      [3, 7],
     ]);
     expect([levelIndex, phraseIndex]).toEqual([0, 0]);
-    expect(maxStars(full)).toBe(3 * (8 + 12 + 4));
+    expect(maxStars(full)).toBe(3 * (8 + 18 + 7));
   });
 
-  it('plays all 12 level-2 words in file order, grouped by minimal sets', () => {
+  it('plays all 18 level-2 words in file order, grouped by minimal sets', () => {
     const { plan: full } = buildSessionPlan(LESSONS, cfg);
     const ids = full.levels[1].phrases.map((p) => p.id);
     expect(ids).toEqual(LESSONS.filter((e) => e.level === 2).map((e) => e.id));
     const families = ids.map((id) => id.split('-')[1]);
-    // Each family (oko, igba, orun, iya, baba) is contiguous, so its contrasts are heard together.
+    // Each family (oko, igba, orun, iya, baba, obe, ile, ilu, oro) is contiguous, so its
+    // contrasts are heard together.
     const seen: string[] = [];
     for (const f of families) {
       if (seen[seen.length - 1] !== f) {
@@ -214,7 +215,7 @@ describe('buildSessionPlan', () => {
         seen.push(f);
       }
     }
-    expect(seen).toEqual(['oko', 'igba', 'orun', 'iya', 'baba']);
+    expect(seen).toEqual(['oko', 'igba', 'orun', 'iya', 'baba', 'obe', 'ile', 'ilu', 'oro']);
   });
 
   it('jumps to ?lesson=<id>, inserting a phrase that is outside the played slice', () => {
@@ -576,8 +577,11 @@ describe('session length estimate (a model; UNVERIFIED until playtests)', () => 
     );
     expect(fast).toBeLessThan(normal);
     expect(normal).toBeGreaterThan(4.5);
-    // Even if every phrase needs all three tries, the session stays inside the 10-minute limit.
-    expect(worst).toBeLessThan(10);
+    // With the confirmed L2/L3 batch (33 entries), the all-misses worst case is ~13.5 min,
+    // over the 10-minute contest limit. PR #29 (feat/session-cap) adds an 8.5-minute soft cap
+    // that ends the session at a phrase boundary; this model has no cap logic, so it can't
+    // assert the capped figure. Loose bound here only to catch a wild regression.
+    expect(worst).toBeLessThan(20);
   });
 });
 
@@ -593,31 +597,14 @@ describe('content additions (no code change needed)', () => {
     expect(report.errors).toEqual([]);
     expect(report.draftIds).toHaveLength(5); // new entries start as draft; the build still passes
     const { plan: grown } = buildSessionPlan(added, cfg);
-    expect(grown.levels.map((l) => l.phrases.length)).toEqual([8, 15, 6]);
+    expect(grown.levels.map((l) => l.phrases.length)).toEqual([8, 21, 9]);
   });
 
-  it('reports how many entries reach 6 to 8 minutes at a normal pace', () => {
-    const minutesWith = (entries: LessonEntry[]) =>
-      estimateSessionMs(buildSessionPlan(entries, cfg).plan, cfg, NORMAL_PACE).totalMs / 60_000;
-    const needed = (level: 2 | 3, syllables: number, target: number) => {
-      let n = 0;
-      while (minutesWith([...LESSONS, ...extra(n, level, syllables)]) < target) {
-        n += 1;
-      }
-      return n;
-    };
-    const l2For6 = needed(2, 2, 6);
-    const l2For7 = needed(2, 2, 7);
-    const l3For6 = needed(3, 3, 6);
-    const l3For7 = needed(3, 3, 7);
-    const mix = minutesWith([...LESSONS, ...extra(4, 2, 2), ...extra(3, 3, 3)]);
-    console.log(
-      `[estimate] now ${minutesWith([...LESSONS]).toFixed(2)} min; 6 min needs +${l2For6} two-syllable L2 or +${l3For6} three-syllable L3; 7 min needs +${l2For7} L2 or +${l3For7} L3; +4 L2 and +3 L3 gives ${mix.toFixed(2)} min`,
-    );
-    expect(l2For6).toBeGreaterThan(0);
-    expect(mix).toBeGreaterThan(6);
-    expect(mix).toBeLessThan(8);
-  });
+  // The "how many more entries to reach 6-8 min" projection this block used to run is retired:
+  // it existed to tell the CTO how much content to request, and the confirmed batch (6 L2
+  // words + 3 L3 phrases) that answer produced is now in LESSONS, landing the normal-pace
+  // estimate at 7.29 min — inside the 6-8 min target (see the "estimates the full session" test
+  // above for the up-to-date normal/first-try/worst figures).
 });
 
 describe('soft session cap', () => {
