@@ -124,9 +124,10 @@ test.describe('Talking Drum VR — P2c lesson flow (IWER hands)', () => {
   }) => {
     test.setTimeout(150_000);
     const errors = trackErrors(page);
-    // The last phrase of the session (M H L L). With ?calib=0 only L and M are reachable, so the
-    // run misses three times (one strike per try, ended by the 4 s gap), hears the answer, and ends.
-    await startLesson(page, 'debug=1&calib=0&lesson=l3-e-kaabo', 'point', 'M');
+    // The last phrase of the session (M L H, l3-e-pele). With ?calib=0 only L and M are reachable,
+    // so the run misses three times (one strike per try, ended by the 4 s gap), hears the answer,
+    // and ends.
+    await startLesson(page, 'debug=1&calib=0&lesson=l3-e-pele', 'point', 'M');
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       await waitForPhase(page, 'YOUR_TURN', 20_000);
       expect((await lesson(page)).attempt).toBe(attempt);
@@ -140,7 +141,7 @@ test.describe('Talking Drum VR — P2c lesson flow (IWER hands)', () => {
     }
     await waitForPhase(page, 'END', 30_000);
     const end = await lesson(page);
-    expect(end.stars['l3-e-kaabo']).toBe(0);
+    expect(end.stars['l3-e-pele']).toBe(0);
     expect(end.history.slice(-3)).toEqual(['DEMO', 'LEVEL_COMPLETE', 'END']);
     await page.waitForTimeout(300);
     await panelPng(page, 'p2c-end-panel.png');
