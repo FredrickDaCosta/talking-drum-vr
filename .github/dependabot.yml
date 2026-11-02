@@ -4,7 +4,10 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
-    open-pull-requests-limit: 5
+    # Paused for the contest freeze (see docs/SECURITY_TRIAGE.md §9): 0 pauses version-update PRs
+    # only. GitHub's Dependabot options reference confirms open-pull-requests-limit does not apply
+    # to security updates, which keep their own separate fixed limit of 10 and are unaffected.
+    open-pull-requests-limit: 0
     # Every ignore rule names a dependency AND lists version-update:* types. Rules scoped by
     # update-types apply to version updates only, so Dependabot security updates still open
     # PRs for these packages. Never add a bare `dependency-name` or `versions` rule here:
@@ -44,7 +47,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
-    open-pull-requests-limit: 5
+    # Paused for the contest freeze; see the npm block above.
+    open-pull-requests-limit: 0
     groups:
       actions-minor-patch:
         applies-to: version-updates
