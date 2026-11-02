@@ -7,8 +7,43 @@
 
 ## Current Stage
 
-**Soft session cap: in its own PR** (`feat/session-cap`; CTO-approved; Claude Code merges it once CI, CodeQL
-and the live smoke are green). **Next: P3 desktop play mode** (new branch and PR; CTO review before merge).
+**Phase 2 content batch 1 merged; P3 desktop mode merged; main is green.** As of 2026-11-02, in order:
+
+- **#28** (`458b1e2`, P2d in-VR debug panel) merged, but its 4 Hz canvas redraw cost ~230 ms per
+  refresh under CI's software renderer, long enough to push the scripted e2e strike below the
+  0.30 m/s detector threshold — main's CI went red (run 40029500968) and Deploy was cancelled.
+- **#30** (`5465a95`, `fix/debug-panel-cost`) fixed it: 640×480 canvas, no mipmaps/anisotropy.
+  Verified with **5 consecutive green CI runs** on the PR branch (original run + 4 `gh run rerun`
+  attempts, each a full fresh job) before merging — a single green run on a flaky test proves
+  little. Main's CI, CodeQL and Deploy (live smoke) are all green on `5465a95`.
+- **#29** (`bdb4fdf`, soft 8.5-minute session cap) merged directly by Fredrick. Main stayed green.
+- **#31** (`77cf504`, P3 desktop play mode: mouse/keyboard/touch, VR stays primary) merged. Main
+  stayed green (Deploy run 41521839221, live smoke 20 passed). See `docs/DESKTOP_MODE.md`.
+  **Note:** a second, concurrent Claude Code session (Opus 5.5) was independently working this
+  branch at the same time and had already pushed its own merge of main into it; this session's
+  rebase overwrote that commit with `git push --force-with-lease`. Diffed both results before
+  pushing — only `docs/PROJECT_STATUS.md` differed (this file, already stale either way), no code
+  or test content was lost.
+- **#33** (`71aa9c4`, `content/l2-l3-batch-1`) merged: Fredrick's confirmed first content batch (6
+  L2 words, 3 L3 phrases, `reviewStatus: 'verified'`, second native-speaker review pending).
+  Normal-pace session estimate is now **7.29 min** (was ~5.3 min), inside the 6-8 min target.
+  Worst-case (all misses) is **13.49 min**, over the 10-min contest limit — the 8.5 min soft cap
+  from #29 is the current mitigation; whether it fully resolves the worst case at runtime is
+  UNVERIFIED (the static estimate model has no cap logic). Merging this batch also surfaced a real
+  test regression: `tests/e2e/lesson-flow.spec.ts`'s END-screen test hardcoded `l3-e-kaabo` as "the
+  last phrase of the session," which broke once 3 more L3 phrases were appended after it (the test
+  now timed out waiting for `END`, stuck in `YOUR_TURN` on the next phrase). Fixed by retargeting
+  the test at the new actual last phrase, `l3-e-pele`.
+- A duplicate docs-sync PR (#35, `docs/status-after-p3`) was opened by the other concurrent
+  session, covering #29/#30/#31 but not #33, the e2e regression, or the collision above; closed as
+  superseded by this update.
+
+Remaining queue: a Dependabot version-update pause (`open-pull-requests-limit: 0` until after the
+Nov 18 contest deadline; security updates are unaffected per GitHub's docs) and an assessment of
+whether a dedicated e2e-strike-helper hardening PR is still needed now that #30 fixed the root
+cause. PR #32 (Dependabot `iwer` 2.6.0 → 2.7.0) was closed unmerged — deferred until after the
+contest freeze; no advisory required it.
+
 P2d merged in #28 (`458b1e2`), P2c in #27 (`5831a6c`), P2b in #26 (`ac4a7e1`), P2a in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
 diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
 `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
@@ -115,12 +150,17 @@ CTO/PM writes the task prompts and Fredrick relays them.
       phrases from Fredrick would reach 6–8 min.
 - [x] P2d merged (#28, `458b1e2`): in-VR debug panel (`?debug=1` only) with fingertip mark / hide
       controls; Quest plan updated to read it in VR; `phrasesPerLevel: 'all'`; `docs/CONTENT_ADDITIONS.md`.
-- [x] CTO decision: a soft session cap of 8.5 min (keep 3 tries per level). Implemented in `feat/session-cap`.
-- [ ] Fredrick: first content batch (6 L2 words + 3 L3 phrases); the CTO will send it. Claude Code adds no
-      Yoruba of its own.
-- [ ] P3: desktop play mode (mouse, keyboard and touch).
+      Left main's CI red (debug-panel frame-cost flake); fixed by #30 (`5465a95`).
+- [x] CTO decision: a soft session cap of 8.5 min (keep 3 tries per level). Merged in #29 (`bdb4fdf`).
+- [x] P3 desktop play mode merged in #31 (`77cf504`); see `docs/DESKTOP_MODE.md`.
+- [x] First content batch merged in #33 (`71aa9c4`): 6 L2 words + 3 L3 phrases, `reviewStatus: 'verified'`.
+      Normal-pace estimate now 7.29 min. Fixed an e2e regression the batch caused (see "Current Stage").
+- [ ] Second native-speaker review of the full L2/L3 content, including batch 1.
+- [ ] CTO/Fredrick: confirm the 8.5 min soft cap actually keeps the worst case under 10 min at
+      runtime (the 13.49 min figure is the uncapped static model).
 - [ ] Fredrick: run `docs/QUEST_TEST_PLAN.md` on a borrowed Quest and send back the results table.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
+- [ ] Dependabot version-update PRs paused until after the Nov 18 contest deadline (own PR, queued).
 
 ### Open Items After M1 (owner in brackets)
 
