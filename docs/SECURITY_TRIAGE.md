@@ -177,3 +177,17 @@ passed in all later local runs and in every CI and live-smoke run. dist was byte
 - **`three` alias policy:** `three` is installed as `npm:super-three@0.181.0`, and Dependabot does not check
   it at all (§7). The `three` / `super-three` / `@types/three` ignore entries are therefore inert. Three
   upgrades are a manual task that needs CTO approval, and `@types/three` must move with them.
+
+## 9. Contest-freeze pause (2026-11-02)
+
+`open-pull-requests-limit: 0` was set on both `.github/dependabot.yml` blocks (npm and
+github-actions) to stop version-update PR noise through the Nov 18, 2026 contest deadline and the
+Nov 15 submission freeze. Confirmed against GitHub's Dependabot options reference before applying:
+`open-pull-requests-limit` governs version-update PRs only; security update PRs have their own
+separate fixed limit of 10 and are not affected by this setting, so a new vulnerability still gets
+a PR. `npm audit` on `main` at the time of this change reported 12 vulnerabilities (1 high
+`body-parser`, 11 moderate `minimatch`/eslint-toolchain) versus 0 when §7 closed — all dev-only
+transitives (`body-parser` via `@iwsdk/reference`'s MCP SDK dependency), none shipping in `dist/`;
+left as-is pending CTO review, not touched by this pause.
+
+**Restore after Nov 19, 2026:** set both `open-pull-requests-limit` values back to `5`.
