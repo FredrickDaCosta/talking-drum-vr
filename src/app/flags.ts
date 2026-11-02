@@ -6,6 +6,7 @@
  * - ?hand=left|right : overrides the primary striking hand
  * - ?calib=0 : skips the squeeze-hand calibration (default open/fist values are used)
  * - ?lesson=<id> : starts the lesson session at that phrase id (from src/content/lessons.ts)
+ * - ?mode=desktop : forces desktop play mode (mouse / keyboard / touch) even where VR is available
  */
 
 import type { Handedness } from './config.js';
@@ -18,6 +19,8 @@ export interface AppFlags {
   readonly calib?: false;
   /** Lesson phrase id to start at (lower-case letters, digits and hyphens only). */
   readonly lesson?: string;
+  /** Present only when ?mode=desktop forces desktop play mode. */
+  readonly mode?: 'desktop';
 }
 
 function isEnabledFlag(value: string | null): boolean {
@@ -65,6 +68,7 @@ export function parseAppFlags(search: string): AppFlags {
     ...(hand !== undefined ? { hand } : {}),
     ...(isDisabledFlag(params.get('calib')) ? { calib: false as const } : {}),
     ...(lesson !== undefined ? { lesson } : {}),
+    ...(params.get('mode')?.trim().toLowerCase() === 'desktop' ? { mode: 'desktop' as const } : {}),
   };
 }
 
