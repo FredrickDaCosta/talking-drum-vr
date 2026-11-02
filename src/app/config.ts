@@ -411,9 +411,11 @@ export const APP_CONFIG: AppConfig = {
     offsetMeters: [0.3, 0.04, 0.16],
     widthMeters: 0.24,
     heightMeters: 0.18,
-    canvasWidthPx: 1024,
-    canvasHeightPx: 768,
-    textPx: 38,
+    // ~640 px across 0.24 m matches the Quest 3 display density at ~0.55 m (~25 px/deg); more
+    // pixels only cost upload time on each 4 Hz refresh.
+    canvasWidthPx: 640,
+    canvasHeightPx: 480,
+    textPx: 24,
     refreshHz: 4,
     touchDepthMeters: 0.03,
     touchRearmMs: 600,

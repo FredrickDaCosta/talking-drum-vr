@@ -5,6 +5,7 @@ import {
   Float32BufferAttribute,
   Group,
   LineBasicMaterial,
+  LinearFilter,
   LineLoop,
   Matrix4,
   Mesh,
@@ -120,7 +121,10 @@ export class VrDebugPanelSystem extends createSystem({
     this.ctx2d = ctx2d;
     this.texture = new CanvasTexture(canvas);
     this.texture.colorSpace = SRGBColorSpace;
-    this.texture.anisotropy = 4;
+    // Re-uploaded at refreshHz: no mipmap chain to rebuild on every upload (the panel is viewed
+    // near its native size, so linear filtering is enough).
+    this.texture.generateMipmaps = false;
+    this.texture.minFilter = LinearFilter;
 
     this.mesh = new Mesh(
       new PlaneGeometry(cfg.widthMeters, cfg.heightMeters),
@@ -387,21 +391,23 @@ export class VrDebugPanelSystem extends createSystem({
     ctx.fillStyle = 'rgba(8, 12, 18, 0.88)';
     ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = 'rgba(88, 166, 255, 0.7)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, width - 4, height - 4);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, width - 3, height - 3);
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    const step = (height - 24) / (this.lines.length + 0.4);
+    const step = (height - 16) / (this.lines.length + 0.4);
+    const labelX = width * 0.02;
+    const valueX = width * 0.225;
     for (let i = 0; i < this.lines.length; i += 1) {
       const line = this.lines[i];
       const bar = line.indexOf('|');
-      const y = 12 + step * (i + 1);
+      const y = 8 + step * (i + 1);
       ctx.font = `700 ${px}px ${LESSON_FONT_FAMILY}, sans-serif`;
       ctx.fillStyle = '#58a6ff';
-      ctx.fillText(line.slice(0, bar), 20, y);
+      ctx.fillText(line.slice(0, bar), labelX, y);
       ctx.font = `400 ${px}px ${LESSON_FONT_FAMILY}, sans-serif`;
       ctx.fillStyle = i >= 10 ? '#f0b429' : '#e6edf3';
-      ctx.fillText(line.slice(bar + 1), 230, y, width - 250);
+      ctx.fillText(line.slice(bar + 1), valueX, y, width - valueX - labelX);
     }
     this.texture.needsUpdate = true;
   }
