@@ -22,7 +22,9 @@ import {
   estimateSessionMs,
   FIRST_TRY_PACE,
   NORMAL_PACE,
+  simulateCappedSessionMs,
   tryMs,
+  WORST_CASE_PACE,
 } from '../../src/game/session-estimate.js';
 
 const cfg: LessonConfig = APP_CONFIG.lesson;
@@ -565,23 +567,33 @@ describe('session length estimate (a model; UNVERIFIED until playtests)', () => 
   it('estimates the full session at a normal pace, first-try pace and worst case', () => {
     const normal = minutes(estimateSessionMs(full, cfg, NORMAL_PACE).totalMs);
     const fast = minutes(estimateSessionMs(full, cfg, FIRST_TRY_PACE).totalMs);
-    const worst = minutes(
-      estimateSessionMs(full, cfg, {
-        ...NORMAL_PACE,
-        averageTries: { 1: 3, 2: 3, 3: 3 },
-        answerShare: { 1: 1, 2: 1, 3: 1 },
-      }).totalMs,
-    );
+    const worst = minutes(estimateSessionMs(full, cfg, WORST_CASE_PACE).totalMs);
     console.log(
-      `[estimate] normal ${normal.toFixed(2)} min, first-try ${fast.toFixed(2)} min, worst ${worst.toFixed(2)} min`,
+      `[estimate] normal ${normal.toFixed(2)} min, first-try ${fast.toFixed(2)} min, worst (uncapped) ${worst.toFixed(2)} min`,
     );
     expect(fast).toBeLessThan(normal);
     expect(normal).toBeGreaterThan(4.5);
-    // With the confirmed L2/L3 batch (33 entries), the all-misses worst case is ~13.5 min,
-    // over the 10-minute contest limit. PR #29 (feat/session-cap) adds an 8.5-minute soft cap
-    // that ends the session at a phrase boundary; this model has no cap logic, so it can't
-    // assert the capped figure. Loose bound here only to catch a wild regression.
-    expect(worst).toBeLessThan(20);
+    // With the confirmed L2/L3 batch (33 entries), the all-misses worst case is ~13.5 min
+    // uncapped, over the 10-minute contest limit. The 8.5-minute soft cap (see the
+    // "simulateCappedSessionMs" test below) is what actually keeps a real session short.
+    expect(worst).toBeGreaterThan(10);
+  });
+
+  it('the 8.5-minute soft cap keeps an all-misses session under the 10-minute contest limit', () => {
+    const capped = simulateCappedSessionMs(full, cfg, WORST_CASE_PACE);
+    const minutesCapped = minutes(capped.totalMs);
+    console.log(
+      `[estimate] worst case with the ${(cfg.sessionCapMs / 60_000).toFixed(1)}-min soft cap: ${minutesCapped.toFixed(2)} min (capped: ${capped.capped}, ${capped.phrasesPlayed} of ${full.levels.reduce((n, l) => n + l.phrases.length, 0)} phrases played)`,
+    );
+    // The cap is checked only at phrase boundaries, so the real worst case overruns
+    // sessionCapMs (8.5 min) by however long the one in-flight phrase's retries and answer take
+    // — never by a whole extra phrase beyond that, and always comfortably inside the 10-min limit.
+    expect(capped.capped).toBe(true);
+    expect(minutesCapped).toBeGreaterThan(cfg.sessionCapMs / 60_000);
+    expect(minutesCapped).toBeLessThan(10);
+    expect(capped.phrasesPlayed).toBeLessThan(
+      full.levels.reduce((n, l) => n + l.phrases.length, 0),
+    );
   });
 });
 
