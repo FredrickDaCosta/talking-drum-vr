@@ -94,6 +94,8 @@ describe('formatVrDebugLines', () => {
       lessonPhase: 'YOUR_TURN',
       lessonLevel: 2,
       phraseId: 'l2-oko-mh',
+      sessionElapsedSec: 192.7,
+      sessionCapSec: 510,
     });
     const marks = new MarkLog(4);
     marks.push(312.44, 140, 0.42, 0.05, 'DEMO', 'l2-oko-mh');
@@ -109,6 +111,7 @@ describe('formatVrDebugLines', () => {
       'Calib|done   open 0.89   fist 0.58',
       'Audio|running   skip nc 0 nr 2 nb 0 inv 0',
       'Lesson|YOUR_TURN   L2   l2-oko-mh',
+      'Session|3:12 / cap 8:30   not reached',
       'Marks|1   (touch panel: R = mark, L = hide)',
       '|#1 t 312.4 s  strikes 140  v 0.42  DEMO l2-oko-mh',
       '|',
@@ -123,6 +126,14 @@ describe('formatVrDebugLines', () => {
     const lines = formatVrDebugLines(createVrDebugSnapshot(), new MarkLog(2), []);
     expect(lines[0]).toBe('FPS|--   frame avg -- / max -- ms (5 s)');
     expect(lines[8]).toBe('Lesson|-   L0   -');
+    expect(lines[9]).toBe('Session|-- / cap --   not reached');
+    const capped = { ...createVrDebugSnapshot(), sessionElapsedSec: 515, sessionCapSec: 510 };
+    expect(formatVrDebugLines({ ...capped, capReached: true }, new MarkLog(2), [])[9]).toBe(
+      'Session|8:35 / cap 8:30   reached (finishing phrase)',
+    );
+    expect(
+      formatVrDebugLines({ ...capped, capReached: true, capped: true }, new MarkLog(2), [])[9],
+    ).toBe('Session|8:35 / cap 8:30   ended session');
   });
 });
 

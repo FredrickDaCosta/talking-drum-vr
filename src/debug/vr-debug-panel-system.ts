@@ -377,6 +377,10 @@ export class VrDebugPanelSystem extends createSystem({
       s.lessonPhase = lesson.phase;
       s.lessonLevel = lesson.level;
       s.phraseId = lesson.phraseId;
+      s.sessionCapSec = lesson.sessionCapMs / 1000;
+      s.sessionElapsedSec = (nowMs - lesson.sessionStartMs) / 1000;
+      s.capped = lesson.capped;
+      s.capReached = Number.isFinite(s.sessionElapsedSec) && s.sessionElapsedSec >= s.sessionCapSec;
     }
     formatVrDebugLines(s, this.marks, this.lines);
     this.draw();
@@ -406,7 +410,7 @@ export class VrDebugPanelSystem extends createSystem({
       ctx.fillStyle = '#58a6ff';
       ctx.fillText(line.slice(0, bar), labelX, y);
       ctx.font = `400 ${px}px ${LESSON_FONT_FAMILY}, sans-serif`;
-      ctx.fillStyle = i >= 10 ? '#f0b429' : '#e6edf3';
+      ctx.fillStyle = i >= 11 ? '#f0b429' : '#e6edf3';
       ctx.fillText(line.slice(bar + 1), valueX, y, width - valueX - labelX);
     }
     this.texture.needsUpdate = true;

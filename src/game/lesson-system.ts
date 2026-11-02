@@ -64,6 +64,10 @@ export interface LessonDiagnostics extends DebugHudLessonProbe {
   xrResets: number;
   cuesPlayed: number;
   pitchHandLost: boolean;
+  /** Soft session cap: start time (performance.now() ms; NaN before the title strike), cap, state. */
+  sessionStartMs: number;
+  sessionCapMs: number;
+  capped: boolean;
 }
 
 /** Debug only (?debug=1): the panel canvas and a font-specimen hook for the diacritics check. */
@@ -142,6 +146,9 @@ export class LessonSystem extends createSystem({
     xrResets: 0,
     cuesPlayed: 0,
     pitchHandLost: false,
+    sessionStartMs: Number.NaN,
+    sessionCapMs: APP_CONFIG.lesson.sessionCapMs,
+    capped: false,
     frameCostAvgMs: Number.NaN,
     frameCostMaxMs: Number.NaN,
   };
@@ -406,6 +413,8 @@ export class LessonSystem extends createSystem({
     d.strikes = s.strikes.map((x) => x.band).join(',');
     d.stars = { ...s.stars };
     d.totalStars = totalStars(s);
+    d.sessionStartMs = s.sessionStartMs;
+    d.capped = s.capped;
     d.version = s.version;
     if (d.history[d.history.length - 1] !== s.phase && d.history.length < HISTORY_LIMIT) {
       d.history.push(s.phase);
