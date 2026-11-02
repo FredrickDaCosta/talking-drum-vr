@@ -7,12 +7,17 @@
 
 ## Current Stage
 
-**Soft session cap: in its own PR** (`feat/session-cap`; CTO-approved; Claude Code merges it once CI, CodeQL
-and the live smoke are green). **Next: P3 desktop play mode** (new branch and PR; CTO review before merge).
-P2d merged in #28 (`458b1e2`), P2c in #27 (`5831a6c`), P2b in #26 (`ac4a7e1`), P2a in #25 (`2487027`). M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
-diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
-`docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
-CTO/PM writes the task prompts and Fredrick relays them.
+**P3 desktop play mode: merged and deployed** in #31 (`77cf504`, merged by Fredrick; Deploy run 41521839221, live
+smoke 20 passed). Next: the first content batch (6 L2 words + 3 L3 phrases) from the CTO, then the borrowed-Quest
+session (`docs/QUEST_TEST_PLAN.md`).
+
+- **Also merged:** the soft session cap in #29 (`bdb4fdf`), and the debug-panel refresh fix in #30 (`5465a95`,
+  merged by Fredrick; it turned `main` CI green again).
+- **Earlier:** P2d in #28 (`458b1e2`), P2c in #27 (`5831a6c`), P2b in #26 (`ac4a7e1`), P2a in #25 (`2487027`).
+  M1 is closed (tag `m1` on `8484a50`, pushed by Fredrick). The audio
+  diagnostics and safe resume work (PR #24, `3e96474`) is merged and deployed. The plan is in
+  `docs/PHASE2_PLAN.md`. Implementation was handed from Antigravity to Claude Code (cloud session); the
+  CTO/PM writes the task prompts and Fredrick relays them.
 
 - **M1a:** Merged in PR #12 (`f1245d5`) — local XR hand profiles, 3D One Euro filter, pure
   `StrikeDetector`.
@@ -115,10 +120,13 @@ CTO/PM writes the task prompts and Fredrick relays them.
       phrases from Fredrick would reach 6–8 min.
 - [x] P2d merged (#28, `458b1e2`): in-VR debug panel (`?debug=1` only) with fingertip mark / hide
       controls; Quest plan updated to read it in VR; `phrasesPerLevel: 'all'`; `docs/CONTENT_ADDITIONS.md`.
-- [x] CTO decision: a soft session cap of 8.5 min (keep 3 tries per level). Implemented in `feat/session-cap`.
+- [x] CTO decision: a soft session cap of 8.5 min (keep 3 tries per level). Merged in #29 (`bdb4fdf`).
+- [x] Debug-panel refresh fix merged in #30 (`5465a95`).
+- [x] P3 desktop play mode merged in #31 (`77cf504`); see `docs/DESKTOP_MODE.md`.
 - [ ] Fredrick: first content batch (6 L2 words + 3 L3 phrases); the CTO will send it. Claude Code adds no
       Yoruba of its own.
-- [ ] P3: desktop play mode (mouse, keyboard and touch).
+- [ ] P3 follow-ups (UNVERIFIED): real phones and tablets (Safari, Android Chrome, iOS audio unlock), lesson
+      panel legibility in portrait, desktop audio latency, "Play without a headset" inside Quest Browser.
 - [ ] Fredrick: run `docs/QUEST_TEST_PLAN.md` on a borrowed Quest and send back the results table.
 - [ ] Real-Quest tuning session (~Nov 1): squeeze defaults, band thresholds, filter, ladder placement.
 
