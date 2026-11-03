@@ -29,6 +29,13 @@ export const FIRST_TRY_PACE: PacingAssumptions = {
   answerShare: { 1: 0, 2: 0, 3: 0 },
 };
 
+/** Every attempt uses all of `maxTries` and is followed by the answer replay. */
+export const WORST_CASE_PACE: PacingAssumptions = {
+  ...NORMAL_PACE,
+  averageTries: { 1: 3, 2: 3, 3: 3 },
+  answerShare: { 1: 1, 2: 1, 3: 1 },
+};
+
 /** Demo, pause, echo and feedback for one try at an n-syllable phrase (milliseconds). */
 export function tryMs(syllables: number, config: LessonConfig, pace: PacingAssumptions): number {
   const demo = config.demoLeadInMs + syllables * config.syllableIntervalMs + config.postDemoPauseMs;
@@ -58,4 +65,45 @@ export function estimateSessionMs(
     return ms;
   });
   return { totalMs: pace.startMs + perLevelMs.reduce((a, b) => a + b, 0), perLevelMs };
+}
+
+export interface CappedSessionResult {
+  /** Total wall-clock time, `pace.startMs` (title + strike + calibration, before the cap clock
+   * starts) plus however much of the plan played before the cap ended the session. */
+  readonly totalMs: number;
+  /** Whether `sessionCapMs` ended the session before the whole plan played. */
+  readonly capped: boolean;
+  readonly phrasesPlayed: number;
+}
+
+/**
+ * Simulates a session against `capReached` (`lesson-machine.ts`): the soft cap is checked only at
+ * phrase boundaries — after a phrase ends (its retries and answer included) and after a level
+ * result — never mid-phrase. This mirrors those checkpoints to find the real maximum wall-clock
+ * time a session can run, not just the uncapped total `estimateSessionMs` reports.
+ */
+export function simulateCappedSessionMs(
+  plan: SessionPlan,
+  config: LessonConfig = APP_CONFIG.lesson,
+  pace: PacingAssumptions = WORST_CASE_PACE,
+): CappedSessionResult {
+  let elapsedMs = 0;
+  let phrasesPlayed = 0;
+  const capReached = () => Number.isFinite(config.sessionCapMs) && elapsedMs >= config.sessionCapMs;
+
+  levels: for (const level of plan.levels) {
+    elapsedMs += config.levelIntroMs;
+    for (const phrase of level.phrases) {
+      const n = phrase.tones.length;
+      const tries = Math.min(config.maxTries, pace.averageTries[level.level]);
+      const answer = config.demoLeadInMs + n * config.syllableIntervalMs + config.postDemoPauseMs;
+      elapsedMs += tries * tryMs(n, config, pace) + pace.answerShare[level.level] * answer;
+      phrasesPlayed += 1;
+      if (capReached()) break levels;
+    }
+    elapsedMs += config.levelCompleteMs;
+    if (capReached()) break levels;
+  }
+
+  return { totalMs: pace.startMs + elapsedMs, capped: capReached(), phrasesPlayed };
 }
