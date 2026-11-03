@@ -95,6 +95,9 @@ export class VrDebugPanelSystem extends createSystem({
     count: 0,
   };
   private readonly marks = new MarkLog(APP_CONFIG.debugPanel.markCapacity);
+  private readonly overridesText = (window.__talkingDrumOverrides ?? [])
+    .map((o) => `${o.param}=${o.value}`)
+    .join(' ');
   private readonly touchLeft = new PanelTouch(APP_CONFIG.debugPanel.touchRearmMs);
   private readonly touchRight = new PanelTouch(APP_CONFIG.debugPanel.touchRearmMs);
   private lastFrameMs = Number.NaN;
@@ -387,6 +390,7 @@ export class VrDebugPanelSystem extends createSystem({
       s.capped = lesson.capped;
       s.capReached = Number.isFinite(s.sessionElapsedSec) && s.sessionElapsedSec >= s.sessionCapSec;
     }
+    s.overridesText = this.overridesText;
     formatVrDebugLines(s, this.marks, this.lines);
     this.draw();
     this.hooks.refreshes += 1;

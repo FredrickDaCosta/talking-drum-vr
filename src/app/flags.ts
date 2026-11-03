@@ -7,6 +7,8 @@
  * - ?calib=0 : skips the squeeze-hand calibration (default open/fist values are used)
  * - ?lesson=<id> : starts the lesson session at that phrase id (from src/content/lessons.ts)
  * - ?mode=desktop : forces desktop play mode (mouse / keyboard / touch) even where VR is available
+ * - ?place=fixed : forces the drum's fixed scene-authored placement in VR (skips the adaptive,
+ *   head-relative placement), for comparison
  */
 
 import type { Handedness } from './config.js';
@@ -21,6 +23,8 @@ export interface AppFlags {
   readonly lesson?: string;
   /** Present only when ?mode=desktop forces desktop play mode. */
   readonly mode?: 'desktop';
+  /** Present only when ?place=fixed forces the scene's fixed drum placement in VR. */
+  readonly place?: 'fixed';
 }
 
 function isEnabledFlag(value: string | null): boolean {
@@ -69,6 +73,7 @@ export function parseAppFlags(search: string): AppFlags {
     ...(isDisabledFlag(params.get('calib')) ? { calib: false as const } : {}),
     ...(lesson !== undefined ? { lesson } : {}),
     ...(params.get('mode')?.trim().toLowerCase() === 'desktop' ? { mode: 'desktop' as const } : {}),
+    ...(params.get('place')?.trim().toLowerCase() === 'fixed' ? { place: 'fixed' as const } : {}),
   };
 }
 

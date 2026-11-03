@@ -37,6 +37,8 @@ export interface VrDebugSnapshot {
   sessionCapSec: number;
   capReached: boolean;
   capped: boolean;
+  /** Active ?debug=1 tuning overrides (src/app/debug-overrides.ts), e.g. "strikeMinSpeed=0.2", or "" when none are active. */
+  overridesText: string;
 }
 
 export function createVrDebugSnapshot(): VrDebugSnapshot {
@@ -71,6 +73,7 @@ export function createVrDebugSnapshot(): VrDebugSnapshot {
     sessionCapSec: Number.NaN,
     capReached: false,
     capped: false,
+    overridesText: '',
   };
 }
 
@@ -87,7 +90,7 @@ function markText(mark: DebugMark | null): string {
 }
 
 /** Number of text lines the panel draws (constant, so the layout never moves). */
-export const VR_DEBUG_LINE_COUNT = 13;
+export const VR_DEBUG_LINE_COUNT = 14;
 
 /** m:ss for a duration in seconds, or "--". */
 export function minSec(seconds: number): string {
@@ -122,5 +125,6 @@ export function formatVrDebugLines(s: VrDebugSnapshot, marks: MarkLog, lines: st
   lines[10] = `Marks|${marks.count}   (touch panel: R = mark, L = hide)`;
   lines[11] = `|${markText(marks.newest(0))}`;
   lines[12] = `|${markText(marks.newest(1))}`;
+  lines[13] = `Overrides|${s.overridesText || 'none'}`;
   return lines;
 }

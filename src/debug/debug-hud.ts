@@ -1,6 +1,7 @@
 import type { Handedness } from '../app/config.js';
 import type { HandTrackingQuality } from '../input/hand-tracker.js';
 import type { PitchHandState } from '../input/left-hand-pitch.js';
+import { buildDebugReport, copyReportToClipboard } from './report.js';
 
 export interface DebugHudTelemetry {
   handedness: Handedness;
@@ -126,6 +127,9 @@ export class DebugHud {
   private lastPitchText = '';
   private lessonLine: HTMLDivElement | null = null;
   private lastLessonText = '';
+  private copyButton: HTMLButtonElement | null = null;
+  private copyStatusLine: HTMLDivElement | null = null;
+  private copyStatusResetTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly throttleIntervalMs: number;
   private lastWriteTimestampMs = -Infinity;
   private lastRenderedStrikeCount = -1;
@@ -171,9 +175,33 @@ export class DebugHud {
     pitchLine.dataset.testid = 'debug-hud-pitch';
     const lessonLine = document.createElement('div');
     lessonLine.dataset.testid = 'debug-hud-lesson';
-    el.append(mainLine, audioLine, pitchLine, lessonLine);
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.textContent = 'Copy report';
+    copyButton.dataset.testid = 'debug-hud-copy-report';
+    copyButton.style.cssText = [
+      'margin-top:6px',
+      'padding:3px 8px',
+      'border-radius:4px',
+      'border:1px solid rgba(88,166,255,0.5)',
+      'background:rgba(88,166,255,0.12)',
+      'color:#c9d1d9',
+      'font:500 11px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+      'pointer-events:auto',
+      'cursor:pointer',
+    ].join(';');
+    copyButton.addEventListener('click', () => {
+      void this.onCopyReportClick();
+    });
+    const copyStatusLine = document.createElement('div');
+    copyStatusLine.dataset.testid = 'debug-hud-copy-status';
+
+    el.append(mainLine, audioLine, pitchLine, lessonLine, copyButton, copyStatusLine);
     this.pitchLine = pitchLine;
     this.lessonLine = lessonLine;
+    this.copyButton = copyButton;
+    this.copyStatusLine = copyStatusLine;
     parent.appendChild(el);
     this.element = el;
     this.mainLine = mainLine;
@@ -269,6 +297,25 @@ export class DebugHud {
     }
   }
 
+  private async onCopyReportClick(): Promise<void> {
+    const report = buildDebugReport();
+    const copied = await copyReportToClipboard(report);
+    if (this.copyStatusLine === null) {
+      return;
+    }
+    this.copyStatusLine.textContent = copied
+      ? `Copied (${report.split('\n').length} lines).`
+      : 'Copy failed — select and copy the report manually.';
+    if (this.copyStatusResetTimer !== null) {
+      clearTimeout(this.copyStatusResetTimer);
+    }
+    this.copyStatusResetTimer = setTimeout(() => {
+      if (this.copyStatusLine !== null) {
+        this.copyStatusLine.textContent = '';
+      }
+    }, 4000);
+  }
+
   dispose(): void {
     if (this.element !== null) {
       this.element.remove();
@@ -281,6 +328,12 @@ export class DebugHud {
       this.lastLessonText = '';
       this.lastText = '';
       this.lastAudioText = '';
+      this.copyButton = null;
+      this.copyStatusLine = null;
+      if (this.copyStatusResetTimer !== null) {
+        clearTimeout(this.copyStatusResetTimer);
+        this.copyStatusResetTimer = null;
+      }
       if (DebugHud.active === this) {
         DebugHud.active = null;
       }

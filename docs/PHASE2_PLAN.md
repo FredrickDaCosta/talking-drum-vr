@@ -432,3 +432,86 @@ borrowed-Quest session needs the key numbers inside VR.
   four-syllable L3 phrase with three tries and the answer, so ≈9.1 min, inside the 10-minute limit.
 - **Debug panel:** the `Session` line shows `m:ss / cap 8:30` and `not reached`, `reached (finishing phrase)`
   or `ended session`.
+- **Simulated, not just estimated:** `src/game/session-estimate.ts`'s `simulateCappedSessionMs` walks the
+  plan phrase by phrase at the same checkpoints `capReached` uses (`tests/unit/lesson.test.ts`, "the
+  8.5-minute soft cap keeps an all-misses session under the 10-minute contest limit"). With the current
+  33-entry content set (batch 1 merged), an all-misses session runs **8.91 min** before the cap ends it (23
+  of 33 phrases played) — close to the ≈9.1 min hand estimate above, comfortably under 10 min.
+
+## 8. P4 — Real-device risk reduction (no headset, no lead)
+
+Everything below is built against IWER only; real-Quest behaviour for all of it is **UNVERIFIED** until
+Fredrick runs `docs/TESTER_GUIDE.md` on a borrowed headset.
+
+### 8.1 Adaptive placement (VR only)
+
+- **Problem:** the drum, pitch ladder, lesson panel and debug panel were all placed at a fixed world
+  position assuming the player starts at the origin facing -Z. A player who starts anywhere else, or facing
+  a different way, gets geometry that is not actually in front of them.
+- **Fix:** `AdaptivePlacementSystem` (`src/game/adaptive-placement-system.ts`) waits for the head pose to sit
+  still for `adaptivePlacement.stableWindowMs` (1 s, `stablePositionEpsilonMeters` 1 cm), then places the
+  drum `distanceAheadMeters` ahead of the head along its yaw and `belowEyeLevelMeters` below eye height
+  (clamped to `[minEyeHeightMeters, maxEyeHeightMeters]` = seated 1.0 m .. standing 1.8 m), yawed to face the
+  player, tilt unchanged. `PitchLadderSystem`, the lesson panel and the debug panel already derive their
+  position from the drum's live transform every frame (an offset read fresh each `update()`, not a one-time
+  snapshot), so moving the drum moves all of them with no changes to those systems.
+- **Re-placement:** only on a reference-space reset (a recentre; `XRReferenceSpace`'s `reset` event), and
+  never while a lesson attempt (`DEMO` / `YOUR_TURN`) is in progress — a recentre mid-attempt is deferred
+  until the attempt ends (`window.__talkingDrumLesson.phase`).
+- **`?place=fixed`** forces the old fixed placement in VR too, for comparison. Desktop play mode never
+  enters an immersive session, so it always sees the fixed placement regardless.
+- **The math (`src/game/adaptive-placement.ts`) is pure and unit-tested** (`tests/unit/adaptive-placement.test.ts`,
+  118 cases): the eye-to-top-head-centre reach distance is proven identical to the fixed placement's
+  (0.4454 m, inside the 0.61 m limit) for 5 eye heights across the seated-to-standing range × 7 yaws × 3 head
+  positions — yawing and translating the whole drum together is a rigid rotation of the eye-to-drum vector
+  around the eye, which cannot change its length.
+- **E2e** (`tests/e2e/adaptive-placement.spec.ts`): IWER headset placed at different positions, heights and
+  yaws; asserts the reach distance and that a scripted strike still registers at the moved drum, plus a
+  `?place=fixed` case proving the flag disables all of this. Two test-tooling additions were needed:
+  `enterVrWithIwerHandsAtPose` sets the emulated headset's pose inside the device's construction init
+  script rather than after entering VR, because setting it afterwards races `stableWindowMs` under load (the
+  default pose can "stabilise" and get placed on before a later override arrives — nothing but a recentre
+  re-triggers placement); `rightHandStrikeAtCurrentDrum` reads the drum's live `drumTopHeadNormalWorld`
+  instead of the original `rightHandStrike` helper's hardcoded, un-yawed tilt geometry, which only strikes
+  correctly at yaw 0.
+- **Found and removed a real conflict, not a test artefact:** `PanelSystem` (`src/panel.ts`) already had a
+  one-time, per-session "place the drum near the head" step left over from the M0 scaffold (`ab78f5a`,
+  before the fixed scene placement existed) — immediate on a `headWorldPos.y > 0.3` check, with no yaw, no
+  stability window, and no knowledge of `?place=fixed`. It ran unconditionally alongside the new system, so
+  under `?place=fixed` the drum still moved (to PanelSystem's naive, un-yawed position) instead of staying
+  at the scene's fixed placement, and in the general case it placed the drum once early, immediately
+  overwritten by `AdaptivePlacementSystem`'s later, correct placement — masking the conflict until
+  `?place=fixed` exposed it. Removed the dead block, its `calibratedInSession` field and now-unused
+  `drums` query from `PanelSystem` entirely; `AdaptivePlacementSystem` is its complete replacement.
+
+### 8.2 Debug tuning overrides
+
+`src/app/debug-overrides.ts`: with `?debug=1` only, numeric URL params override `APP_CONFIG` values before
+any system reads them — strike thresholds, demo syllable interval, pitch ratios and band thresholds,
+calibration separation, and placement distance/height offset (see the file for the full param list and
+valid ranges). An out-of-range or unparsable value is ignored with a `console.warn`, never applied. Active
+overrides show on the debug panel's `Overrides` line and in the Copy Report.
+
+### 8.3 Copy Report
+
+`src/debug/report.ts`, wired to a **Copy report** button on the flat `?debug=1` HUD: build version (commit
+SHA, injected at build time via `vite.config.ts`'s `define`), user agent, XR session state, hand tracking
+states, FPS/frame-gap/pipeline/audio-latency numbers, calibration open/fist/range, active overrides and
+placement values, the last 32 marks, and lesson progress — all read from the diagnostics globals the
+running systems already publish (`window.__talkingDrum*`), so no new cross-system plumbing was needed. No
+network use: `navigator.clipboard.writeText`, with a hidden-textarea `execCommand('copy')` fallback.
+
+### 8.4 `docs/TESTER_GUIDE.md`
+
+One page for a stranger with a Quest: open with `?debug=1`, six quick checks (strike reliability, false/
+missed hits, squeeze pitch control, sound delay, panel readability/reach, comfort), then Copy Report and
+send it back with notes. Names the three things most wanted: strike reliability, squeeze controllability,
+and physical comfort/reach.
+
+### 8.5 Squeeze fallback review
+
+`docs/SQUEEZE_FALLBACK_REVIEW.md` — **review only, nothing implemented.** Covers three real-tracking failure
+modes (partial curl noise, hand-size/gesture-habit differences, one hand untracked) and proposes the
+cheapest fallback: derive band thresholds from the player's own calibrated range rather than fixed
+constants, degrade from 3 bands to 2 if that range is too narrow, and surface (rather than silently
+freeze on) a genuinely lost squeeze hand.
