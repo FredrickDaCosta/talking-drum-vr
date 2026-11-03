@@ -115,10 +115,17 @@ describe('formatVrDebugLines', () => {
       'Marks|1   (touch panel: R = mark, L = hide)',
       '|#1 t 312.4 s  strikes 140  v 0.42  DEMO l2-oko-mh',
       '|',
+      'Overrides|none',
     ]);
     for (const line of lines) {
       expect(line).toMatch(/^[\x20-\x7e]*$/); // plain ASCII
     }
+  });
+
+  it('shows active overrides when present', () => {
+    const s = { ...createVrDebugSnapshot(), overridesText: 'strikeMinSpeed=0.2 pitchHigh=1.5' };
+    const lines = formatVrDebugLines(s, new MarkLog(2), []);
+    expect(lines[13]).toBe('Overrides|strikeMinSpeed=0.2 pitchHigh=1.5');
   });
 
   it('shows "--" for missing numbers', () => {

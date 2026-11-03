@@ -6,6 +6,33 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **P4, real-device risk reduction (no headset, no lead):**
+  - **Adaptive placement (VR only):** the drum (and, through the existing "offset from the live drum
+    transform" pattern, the pitch ladder, lesson panel and debug panel with it) now places itself relative
+    to the player's head once the pose sits still for 1 s, instead of at a fixed world position — yawed to
+    face the player, tilted as before, drum height clamped to a seated-to-standing eye-height range.
+    Re-places only on a recentre, never mid-attempt. `?place=fixed` forces the old fixed placement for
+    comparison. The reach-distance math is pure and unit-tested (118 cases: proven identical to the fixed
+    placement's 0.4454 m for every head height and yaw tested). Removed a real, previously-undetected
+    conflict in the process: `PanelSystem` had its own one-time, un-yawed, `?place=fixed`-blind "place the
+    drum near the head" step left over from the M0 scaffold, fully superseded by this system.
+  - **Debug tuning overrides** (`?debug=1` only): numeric URL params override strike thresholds, demo
+    syllable interval, pitch ratios/bands, calibration separation, and placement distance/height, validated
+    against a range and ignored with a `console.warn` otherwise. Shown on the debug panel and in the report.
+  - **Copy Report:** a button on the flat `?debug=1` HUD copies a plain-text diagnostic report (build
+    version, user agent, XR state, hand/calibration/pitch/lesson state, FPS/latency numbers, active
+    overrides and placement values, the last 32 marks) to the clipboard, with a textarea fallback.
+  - **`docs/TESTER_GUIDE.md`:** a one-page guide for a stranger testing on a borrowed Quest.
+  - **`docs/SQUEEZE_FALLBACK_REVIEW.md`:** review only (not implemented) of how calibration/squeeze can fail
+    on real hand tracking and the cheapest fallback if 3 clean pitch bands aren't achievable.
+- **Capped worst-case session simulation** (`simulateCappedSessionMs`, `src/game/session-estimate.ts`):
+  mirrors the soft session cap's real phrase-boundary checkpoints instead of the uncapped estimate. For the
+  current content set, an all-misses session runs 8.91 min before the cap ends it — inside the 10-minute
+  limit.
+- **Content batch 1:** 6 confirmed level-2 words and 3 level-3 phrases (`src/content/lessons.ts`), bringing
+  the normal-pace session estimate to ≈7.29 min.
+- **P3, desktop play mode:** mouse/keyboard/touch play without a headset (`src/desktop/`); VR stays primary
+  where available. See `docs/DESKTOP_MODE.md`.
 - **Soft session cap** (`lesson.sessionCapMs`, 8.5 min from the title strike): once it passes, the phrase in
   progress finishes normally, then the session goes to END. The debug panel shows the elapsed time and the
   cap state.

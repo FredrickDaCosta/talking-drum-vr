@@ -1,7 +1,6 @@
-import { createSystem, type UIKit, UIKitMLAsset, Vector3, VisibilityState } from '@iwsdk/core';
+import { createSystem, type UIKit, UIKitMLAsset, VisibilityState } from '@iwsdk/core';
 import { APP_CONFIG } from './app/config.js';
 import { getAppFlags } from './app/flags.js';
-import { TalkingDrum } from './app/talking-drum-component.js';
 import { drumAudio } from './audio/audio-unlock.js';
 import {
   countXrInputSourcesInto,
@@ -21,12 +20,8 @@ declare global {
   }
 }
 
-export class PanelSystem extends createSystem({
-  drums: { required: [TalkingDrum] },
-}) {
+export class PanelSystem extends createSystem({}) {
   private fpsOverlay: FpsOverlay | null = null;
-  private headWorldPos = new Vector3();
-  private calibratedInSession = false;
   private readonly inputCounts: XrInputCounts = { hands: 0, controllers: 0 };
   private sessionStartMs = 0;
   private lastHandSeenMs = -Infinity;
@@ -142,7 +137,6 @@ export class PanelSystem extends createSystem({
       this.world.visibilityState.subscribe((visibilityState) => {
         const is2D = visibilityState === VisibilityState.NonImmersive;
         if (is2D) {
-          this.calibratedInSession = false;
           if (this.renderedMessage !== null) {
             updateStatusMessage(null);
           }
@@ -183,24 +177,6 @@ export class PanelSystem extends createSystem({
       if (statusChannel.version !== this.seenChannelVersion) {
         this.seenChannelVersion = statusChannel.version;
         this.renderStatus();
-      }
-    }
-    if (isImmersive && !this.calibratedInSession) {
-      this.player.head.updateWorldMatrix(true, false);
-      this.headWorldPos.setFromMatrixPosition(this.player.head.matrixWorld);
-      if (this.headWorldPos.y > 0.3) {
-        const { distanceAheadMeters, belowEyeLevelMeters } = APP_CONFIG.drumPlacement;
-        for (const entity of this.queries.drums.entities) {
-          const obj = entity.object3D;
-          if (obj != null) {
-            obj.position.set(
-              this.headWorldPos.x,
-              this.headWorldPos.y - belowEyeLevelMeters,
-              this.headWorldPos.z - distanceAheadMeters,
-            );
-          }
-        }
-        this.calibratedInSession = true;
       }
     }
   }

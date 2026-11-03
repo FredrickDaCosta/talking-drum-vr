@@ -38,6 +38,8 @@ export interface TalkingDrumRuntimeDiagnostics {
   lastFrameTimestampMs: number;
   /** False when the player rig is not at identity (reference-space poses are re-based onto it). */
   playerRigIsIdentity: boolean;
+  /** world.visibilityState this frame: 'NonImmersive' | 'Visible' | 'VisibleBlurred'. */
+  xrVisibilityState: string;
 }
 
 declare global {
@@ -161,6 +163,7 @@ export class StrikeSystem extends createSystem({
     lastStrikeRadialMeters: 0,
     lastFrameTimestampMs: 0,
     playerRigIsIdentity: true,
+    xrVisibilityState: 'NonImmersive',
   };
 
   private debugHud: DebugHud | null = null;
@@ -380,7 +383,9 @@ export class StrikeSystem extends createSystem({
 
     this.refreshDrumTransformDiagnostics(drumObj);
 
-    const isImmersive = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    const currentVisibility = this.world.visibilityState.peek();
+    this.diagnostics.xrVisibilityState = currentVisibility;
+    const isImmersive = currentVisibility !== VisibilityState.NonImmersive;
     if (!isImmersive) {
       if (this.wasImmersive) {
         this.handTracker.reset();

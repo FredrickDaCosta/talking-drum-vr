@@ -17,6 +17,25 @@ export interface DrumPlacementConfig {
   readonly drumTiltDeg: number;
 }
 
+export interface AdaptivePlacementConfig {
+  /** Whether the rig re-places itself relative to the player's head (false / ?place=fixed: the
+   * scene's authored world position is used as-is, as before P4). */
+  readonly enabled: boolean;
+  /** How long the head pose must stay within `stablePositionEpsilonMeters` before placing (ms). */
+  readonly stableWindowMs: number;
+  /** Frame-to-frame head position movement below this counts as "stable" (meters). */
+  readonly stablePositionEpsilonMeters: number;
+  /**
+   * Head height (eye level) is clamped to this range before computing drum height, so a
+   * momentary bad pose (or a genuinely extreme head height) cannot place the rig somewhere
+   * degenerate. Within this range the 0.61 m reach distance is exactly the same as the fixed
+   * placement's (the clamp input range, not an output clamp on the reach itself): seated ~1.0 m to
+   * standing ~1.8 m.
+   */
+  readonly minEyeHeightMeters: number;
+  readonly maxEyeHeightMeters: number;
+}
+
 export interface DrumGeometryConfig {
   /** Total length of the hourglass drum shell (meters). */
   readonly lengthMeters: number;
@@ -271,6 +290,7 @@ export interface AppConfig {
   readonly appTitle: string;
   readonly defaultBasePath: string;
   readonly drumPlacement: DrumPlacementConfig;
+  readonly adaptivePlacement: AdaptivePlacementConfig;
   readonly drumGeometry: DrumGeometryConfig;
   readonly strike: StrikeConfig;
   readonly handTracking: HandTrackingConfig;
@@ -298,6 +318,13 @@ export const APP_CONFIG: AppConfig = {
     distanceAheadMeters: 0.5,
     belowEyeLevelMeters: 0.35,
     drumTiltDeg: 30,
+  },
+  adaptivePlacement: {
+    enabled: true,
+    stableWindowMs: 1000,
+    stablePositionEpsilonMeters: 0.01,
+    minEyeHeightMeters: 1.0,
+    maxEyeHeightMeters: 1.8,
   },
   drumGeometry: {
     lengthMeters: 0.38,
